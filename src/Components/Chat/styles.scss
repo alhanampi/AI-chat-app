@@ -1,0 +1,188 @@
+.chatApp {
+  width: 100%;
+  height: 93vh;
+  display: flex;
+  border: 1px solid var(--switch-inactive);
+
+  .chatList {
+    width: 30%;
+    height: 100%;
+    background-color: var(--bg-color);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    row-gap: 1rem;
+    border: 1px 1px 0 0 solid var(--switch-inactive);
+
+    .chatListHeader {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2rem 1rem;
+      color: var(--main);
+
+      h2 {
+        font-family: "Exo 2", sans-serif;
+        font-size: 2rem;
+        text-transform: uppercase;
+      }
+    }
+
+    .chatListItem {
+      width: 100%;
+      height: 6rem;
+      background-color: var(--switch-inactive);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 0.5rem 0.5rem rgba(0, 0, 0, 0.1);
+
+      &.active {
+        background: linear-gradient(135deg, var(--main), var(--accent));
+      }
+
+      & h4 {
+        font-size: 1.6rem;
+        font-weight: 300;
+        color: var(--text-color-soft);
+
+        &.active {
+          color: var(--text-color);
+          font-weight: 600;
+        }
+      }
+    }
+
+    i {
+      font-size: 2.5rem;
+      color: var(--text-color-soft);
+      transition: 0.2s ease;
+      cursor: pointer;
+      &:hover {
+        color: var(--text-color);
+      }
+    }
+  }
+
+  .chatWindow {
+    width: 70%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--switch-inactive);
+    border-top: 0;
+    border-bottom: 0;
+
+    .chatTitle {
+      width: 100%;
+      min-height: 8rem;
+      background-color: var(--bg-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-right: 2rem;
+
+      h3 {
+        font-family: "Exo 2", sans-serif;
+        font-size: 2rem;
+        text-transform: uppercase;
+        color: var(--text-color);
+        letter-spacing: 0.1rem;
+      }
+
+      .arrow {
+        font-size: 4rem;
+        color: var(--main);
+        transform: rotate(180deg);
+        cursor: pointer;
+      }
+    }
+    .chat {
+      width: 100%;
+      flex-grow: 1;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      row-gap: 4rem;
+
+      .userPrompt,
+      .aiResponse {
+        max-width: 80%;
+        padding: 2rem;
+        font-size: 1.6rem;
+        color: var(--text-color);
+        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.1);
+      }
+
+      .userPrompt {
+        background: linear-gradient(135deg, var(--main), var(--accent));
+        align-self: flex-end;
+        border-radius: 3rem 0.3rem 3rem;
+        text-align: right;
+      }
+
+      .aiResponse {
+        background: linear-gradient(135deg, var(--main-alt), var(--accent-alt));
+        border-radius: 0 3rem 3rem 3rem;
+        text-align: left;
+      }
+
+      .messageTimestamp {
+        margin-top: 0.3rem;
+        font-size: 1.2rem;
+        color: var(--text-color-soft);
+      }
+
+      .aiLoader {
+        font-family: "Exo 2", sans-serif;
+        font-size: 1.6rem;
+        color: var(--text-color-soft);
+        margin-top: auto;
+      }
+    }
+
+    .messageForm {
+      width: 100%;
+      height: 10rem;
+      background-color: var(--bg-color);
+      display: flex;
+      align-items: center;
+      box-shadow: 0 -0.2rem 0.5rem rgba(0, 0, 0, 0.1);
+      padding-right: 5rem;
+
+      i {
+        font-size: 2.5rem;
+        color: var(--main);
+        cursor: pointer;
+      }
+
+      .emoji {
+        width: 10rem;
+        display: flex;
+        justify-content: center;
+      }
+
+      .userInput {
+        height: 100%;
+        flex-grow: 1;
+        background-color: transparent;
+        border: none;
+        font-size: 1.8rem;
+        color: var(--main);
+
+        &::placeholder {
+          font-size: 1.8rem;
+          font-weight: 300;
+          color: var(--main);
+        }
+
+        &:focus::placeholder {
+          opacity: 0;
+        }
+      }
+    }
+  }
+}

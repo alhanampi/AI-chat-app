@@ -1,0 +1,153 @@
+import { useEffect, useState } from "react";
+import "./styles.scss";
+import { v4 as uuid } from "uuid";
+import type { ChatObject, Message } from "../../utils/types";
+
+const Chat = () => {
+  const [chats, setChats] = useState<ChatObject[]>([]);
+  const [inputValue, setInputValue] = useState<string>("");
+  const [messages, setMessages] = useState<Message[]>(chats[0]?.messages || []);
+  const [activeChat, setActiveChat] = useState<null | string>(null);
+
+  useEffect(() => {
+    const activeChatObj = chats.find((chat) => chat.id === activeChat);
+    setMessages(activeChatObj ? activeChatObj.messages : []);
+  }, [activeChat, chats]);
+
+  const handleSelectChat = (id: string) => {
+    setActiveChat(id);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleSendMessage = () => {
+    if (inputValue.trim() === "") return;
+
+    const newMessage: Message = {
+      type: "prompt",
+      text: inputValue,
+      timeStamp: new Date().toLocaleString("en-US"),
+    };
+
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
+    setInputValue("");
+
+    const updatedChats = chats.map((chat) => {
+      if (chat.id === activeChat) {
+        return { ...chat, messages: updatedMessages };
+      }
+
+      return chat;
+    });
+    setChats(updatedChats);
+  };
+
+  const handleKeyDown = (e: { key: string; preventDefault: () => void }) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const createNewChat = () => {
+    const newChat: ChatObject = {
+      id: uuid(),
+      date: new Date().toLocaleString("en-US"),
+      messages: [],
+      name: `Conversation ${uuid()}`,
+    };
+
+    const updatedChats = [newChat, ...chats];
+    setChats(updatedChats);
+    setActiveChat(newChat.id);
+  };
+
+  const handleDeleteChat = (id: string) => {
+    const updatedChats = chats.filter((chat) => chat.id !== id);
+    setChats(updatedChats);
+
+    if (id === activeChat) {
+      const newActiveChat = updatedChats.length > 0 ? updatedChats[0].id : null;
+      setActiveChat(newActiveChat);
+    }
+  };
+
+  useEffect(() => {
+    if (chats.length === 0) {
+      createNewChat();
+    }
+  }, []);
+
+  return (
+    <div className="chatApp">
+      <div className="chatList">
+        <div className="chatListHeader">
+          <h2>Chat List</h2>
+          <i className="bx bx-edit-alt newChat" onClick={createNewChat}></i>
+        </div>
+
+        {chats &&
+          chats.map((chat) => (
+            <div
+              key={chat.id}
+              className={`chatListItem${
+                chat.id === activeChat ? " active" : ""
+              }`}
+              onClick={() => handleSelectChat(chat.id)}
+            >
+              <h4 className={chat.id === activeChat ? "active" : ""}>
+                {chat.date}
+              </h4>
+              <i
+                className="bx bx-x circle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteChat(chat.id);
+                }}
+              ></i>
+            </div>
+          ))}
+      </div>
+      <div className="chatWindow">
+        <div className="chatTitle">
+          <h3>Chat with the AI</h3>
+          <i className="bx bx-arrow-back arrow"></i>
+        </div>
+        <div className="chat">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={
+                message.type === "prompt" ? "userPrompt" : "aiResponse"
+              }
+            >
+              {message.text}
+              <div className="messageTimestamp">{message.timeStamp}</div>
+            </div>
+          ))}
+        </div>
+
+        <form className="messageForm" onSubmit={(e) => e.preventDefault()}>
+          <i className="fa-solid fa-face-smile emoji"></i>
+          <input
+            type="text"
+            className="userInput"
+            placeholder="start typing here!"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+          />
+          <i
+            className="fa-solid fa-paper-plane"
+            onClick={handleSendMessage}
+          ></i>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default Chat;

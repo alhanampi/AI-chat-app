@@ -1,0 +1,93 @@
+@import url("https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,100..900;1,100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Outfit:wght@100..900&display=swap");
+
+.dark {
+  --bg-color: #131927;
+  --text-color: #ebf3ff;
+  --text-color-soft: #f3eaf4;
+  --switch-active: #907ad6;
+  --switch-inactive: #bdb5b7;
+  --main: #907ad6;
+  --accent: #dabfff;
+  --main-alt: #47b9ff;
+  --accent-alt: #7fdeff;
+}
+
+.light {
+  --bg-color: #f5f5f5;
+  --text-color: #283552;
+  --text-color-soft: #4f5072;
+  --switch-active: #f32187;
+  --switch-inactive: #aaa;
+  --main: #d4b5e3;
+  --accent: #d5bbdd;
+  --main-alt: #caa1ce;
+  --accent-alt: #b3acc3;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  outline: none;
+  font-family: "Outfit", sans-serif;
+}
+
+html {
+  font-size: 62.5%;
+}
+
+.appContainer {
+  width: 100%;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  background-color: var(--bg-color);
+}
+
+.colorMode {
+  display: flex;
+  align-items: center;
+  margin: 1rem;
+  justify-self: end;
+  padding-right: 2rem;
+
+  .colorText {
+    color: var(--text-color-soft);
+    font-size: 1.6rem;
+    font-weight: 300;
+    margin-right: 1rem;
+  }
+
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    width: 60px;
+    height: 34px;
+    padding: 4px;
+    border-radius: 34px;
+    background-color: var(--switch-inactive);
+    transition: 0.3s;
+
+    &:has(input:checked) {
+      background-color: var(--switch-active);
+    }
+
+    input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: white;
+      transition: 0.3s;
+    }
+
+    input:checked + .slider {
+      transform: translateX(26px);
+    }
+  }
+}
