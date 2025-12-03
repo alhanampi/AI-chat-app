@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import "./styles.scss";
 import { v4 as uuid } from "uuid";
 import type { ChatObject, Message } from "../../utils/types";
+import { sendMessageToAPI } from "../../services/chatService";
 
 const Chat = () => {
   const [chats, setChats] = useState<ChatObject[]>([]);
   const [inputValue, setInputValue] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>(chats[0]?.messages || []);
   const [activeChat, setActiveChat] = useState<null | string>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const activeChatObj = chats.find((chat) => chat.id === activeChat);
@@ -22,7 +24,7 @@ const Chat = () => {
     setInputValue(e.target.value);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputValue.trim() === "") return;
 
     const newMessage: Message = {
@@ -31,18 +33,52 @@ const Chat = () => {
       timeStamp: new Date().toLocaleString("en-US"),
     };
 
-    const updatedMessages = [...messages, newMessage];
+    let updatedMessages;
+
+    if (!activeChat) {
+      createNewChat(inputValue);
+      return;
+    }
+
+    updatedMessages = [...messages, newMessage];
+
     setMessages(updatedMessages);
+
     setInputValue("");
 
     const updatedChats = chats.map((chat) => {
       if (chat.id === activeChat) {
         return { ...chat, messages: updatedMessages };
       }
-
       return chat;
     });
     setChats(updatedChats);
+
+    setIsLoading(true);
+
+    try {
+      const responseText = await sendMessageToAPI(inputValue);
+
+      const aiMessage: Message = {
+        type: "response",
+        text: responseText,
+        timeStamp: new Date().toLocaleString("en-US"),
+      };
+
+      const finalMessages = [...updatedMessages, aiMessage];
+
+      setMessages(finalMessages);
+
+      const finalChats = chats.map((chat) =>
+        chat.id === activeChat ? { ...chat, messages: finalMessages } : chat
+      );
+
+      setChats(finalChats);
+    } catch (error) {
+      console.error(error);
+    }
+
+    setIsLoading(false);
   };
 
   const handleKeyDown = (e: { key: string; preventDefault: () => void }) => {
@@ -52,17 +88,26 @@ const Chat = () => {
     }
   };
 
-  const createNewChat = () => {
+  const createNewChat = (initialMessage: string = "") => {
     const newChat: ChatObject = {
       id: uuid(),
       date: new Date().toLocaleString("en-US"),
-      messages: [],
+      messages: initialMessage
+        ? [
+            {
+              type: "prompt",
+              text: initialMessage,
+              timeStamp: new Date().toLocaleDateString("en-Us"),
+            },
+          ]
+        : [],
       name: `Conversation ${uuid()}`,
     };
 
     const updatedChats = [newChat, ...chats];
     setChats(updatedChats);
     setActiveChat(newChat.id);
+    setInputValue("");
   };
 
   const handleDeleteChat = (id: string) => {
@@ -86,7 +131,10 @@ const Chat = () => {
       <div className="chatList">
         <div className="chatListHeader">
           <h2>Chat List</h2>
-          <i className="bx bx-edit-alt newChat" onClick={createNewChat}></i>
+          <i
+            className="bx bx-edit-alt newChat"
+            onClick={() => createNewChat()}
+          ></i>
         </div>
 
         {chats &&
@@ -128,6 +176,8 @@ const Chat = () => {
               <div className="messageTimestamp">{message.timeStamp}</div>
             </div>
           ))}
+
+          {isLoading && <div className="aiResponse loading">loading...</div>}
         </div>
 
         <form className="messageForm" onSubmit={(e) => e.preventDefault()}>

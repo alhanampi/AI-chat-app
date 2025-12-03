@@ -1,4 +1,3 @@
-// import ChatbotStart from "./Components/ChatbotStart";
 import { useEffect, useState } from "react";
 import Chat from "./Components/Chat";
 import "./index.scss";
@@ -13,17 +12,22 @@ const App = () => {
 
   return (
     <div className="appContainer">
-      <label className="colorMode">
-        <span className="colorText">Dark Mode</span>
-        <span className="switch">
-          <input
-            type="checkbox"
-            checked={isDarkMode}
-            onChange={() => setisDarkMode((prev) => !prev)}
-          />
-          <span className="slider round"></span>
-        </span>
-      </label>
+      <div className="headerContainer">
+        <h1>
+          AI CHATBOT BY PAM! <i className="fa-solid fa-heart"></i>
+        </h1>
+        <label className="colorMode">
+          <span className="colorText">Dark Mode</span>
+          <span className="switch">
+            <input
+              type="checkbox"
+              checked={isDarkMode}
+              onChange={() => setisDarkMode((prev) => !prev)}
+            />
+            <span className="slider round"></span>
+          </span>
+        </label>
+      </div>
       <Chat />
     </div>
   );

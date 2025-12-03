@@ -6,10 +6,10 @@
   --text-color-soft: #f3eaf4;
   --switch-active: #907ad6;
   --switch-inactive: #bdb5b7;
-  --main: #907ad6;
-  --accent: #dabfff;
-  --main-alt: #47b9ff;
-  --accent-alt: #7fdeff;
+  --main: #7564ac;
+  --accent: #a994c6;
+  --main-alt: #3382b4;
+  --accent-alt: #5baac5;
 }
 
 .light {
@@ -42,52 +42,71 @@ html {
   display: grid;
   place-items: center;
   background-color: var(--bg-color);
-}
 
-.colorMode {
-  display: flex;
-  align-items: center;
-  margin: 1rem;
-  justify-self: end;
-  padding-right: 2rem;
-
-  .colorText {
-    color: var(--text-color-soft);
-    font-size: 1.6rem;
-    font-weight: 300;
-    margin-right: 1rem;
-  }
-
-  .switch {
-    display: inline-flex;
+  .headerContainer {
+    display: flex;
     align-items: center;
-    width: 60px;
-    height: 34px;
-    padding: 4px;
-    border-radius: 34px;
-    background-color: var(--switch-inactive);
-    transition: 0.3s;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    padding: 0 2rem;
 
-    &:has(input:checked) {
-      background-color: var(--switch-active);
+    h1 {
+      color: var(--text-color);
+      font-size: 3rem;
+
+      i {
+        color: var(--main);
+      }
     }
 
-    input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
+    .colorMode {
+      display: flex;
+      align-items: center;
+      margin: 1rem;
+      justify-self: end;
+      padding-right: 2rem;
 
-    .slider {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: white;
-      transition: 0.3s;
-    }
+      .colorText {
+        color: var(--text-color-soft);
+        font-size: 1.6rem;
+        font-weight: 300;
+        margin-right: 1rem;
+      }
 
-    input:checked + .slider {
-      transform: translateX(26px);
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        width: 60px;
+        height: 34px;
+        padding: 4px;
+        border-radius: 34px;
+        background-color: var(--switch-inactive);
+        transition: 0.3s;
+
+        &:has(input:checked) {
+          background-color: var(--switch-active);
+        }
+
+        input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .slider {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: white;
+          transition: 0.3s;
+        }
+
+        input:checked + .slider {
+          transform: translateX(26px);
+        }
+      }
     }
   }
 }
