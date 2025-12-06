@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
-import "./styles.scss";
+import { useEffect, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
-import type { ChatObject, Message } from "../../utils/types";
+
 import { sendMessageToAPI } from "../../services/chatService";
+
+import type { ChatObject, Message } from "../../utils/types";
+import MarkdownMessage from "../../utils/Markdown";
+
+import "./styles.scss";
 
 const Chat = () => {
   const [chats, setChats] = useState<ChatObject[]>([]);
@@ -10,6 +14,9 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>(chats[0]?.messages || []);
   const [activeChat, setActiveChat] = useState<null | string>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // autoscroll
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const activeChatObj = chats.find((chat) => chat.id === activeChat);
@@ -120,11 +127,20 @@ const Chat = () => {
     }
   };
 
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   useEffect(() => {
     if (chats.length === 0) {
       createNewChat();
     }
   }, []);
+
+  // scroll
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
 
   return (
     <div className="chatApp">
@@ -172,12 +188,13 @@ const Chat = () => {
                 message.type === "prompt" ? "userPrompt" : "aiResponse"
               }
             >
-              {message.text}
+              <MarkdownMessage text={message.text} />
               <div className="messageTimestamp">{message.timeStamp}</div>
             </div>
           ))}
 
           {isLoading && <div className="aiResponse loading">loading...</div>}
+          <div ref={chatEndRef} />
         </div>
 
         <form className="messageForm" onSubmit={(e) => e.preventDefault()}>
