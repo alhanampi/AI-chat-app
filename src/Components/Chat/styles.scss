@@ -4,77 +4,16 @@
   display: flex;
   border: 1px solid var(--switch-inactive);
 
-  .chatList {
-    width: 30%;
-    height: 100%;
-    background-color: var(--bg-color);
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    row-gap: 1rem;
-    border: 1px 1px 0 0 solid var(--switch-inactive);
-
-    .chatListHeader {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 2rem 1rem;
-      color: var(--main);
-
-      h2 {
-        font-family: "Exo 2", sans-serif;
-        font-size: 2rem;
-        text-transform: uppercase;
-      }
-    }
-
-    .chatListItem {
-      width: 100%;
-      height: 6rem;
-      background-color: var(--switch-inactive);
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 0.5rem 0.5rem rgba(0, 0, 0, 0.1);
-
-      &.active {
-        background: linear-gradient(135deg, var(--main), var(--accent));
-      }
-
-      & h4 {
-        font-size: 1.6rem;
-        font-weight: 300;
-        color: var(--text-color-soft);
-
-        &.active {
-          color: var(--text-color);
-          font-weight: 600;
-        }
-      }
-    }
-
-    i {
-      font-size: 2.5rem;
-      color: var(--text-color-soft);
-      transition: 0.2s ease;
-      cursor: pointer;
-      &:hover {
-        color: var(--text-color);
-      }
-    }
-  }
-
   .chatWindow {
-    width: 70%;
+    flex: 1;
+    min-width: 0;
     height: 100%;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--switch-inactive);
     border-top: 0;
     border-bottom: 0;
+    padding: 1rem;
 
     .chatTitle {
       width: 100%;
@@ -112,17 +51,17 @@
 
       // scroll styles!
       &::-webkit-scrollbar {
-        width: 15px;
+        width: 1.5rem;
       }
 
       &::-webkit-scrollbar-track {
         background: var(--bg-color);
-        border-radius: 10px;
+        border-radius: 1rem;
       }
 
       &::-webkit-scrollbar-thumb {
         background: linear-gradient(135deg, var(--main), var(--accent));
-        border-radius: 10px;
+        border-radius: 1rem;
       }
 
       &::-webkit-scrollbar-thumb:hover {
@@ -152,9 +91,17 @@
       }
 
       .messageTimestamp {
-        margin-top: 0.3rem;
+        margin-top: -1.5rem;
         font-size: 1.2rem;
         color: var(--text-color-soft);
+
+        &--left {
+          text-align: left;
+        }
+
+        &--right {
+          text-align: right;
+        }
       }
 
       .aiLoader {
@@ -167,7 +114,6 @@
 
     .messageForm {
       width: 100%;
-      height: 10rem;
       min-height: 10rem;
       background-color: var(--bg-color);
       display: flex;
@@ -181,10 +127,24 @@
         cursor: pointer;
       }
 
-      .emoji {
+      .emojiWrapper {
+        position: relative;
         width: 10rem;
         display: flex;
         justify-content: center;
+
+        .emoji {
+          font-size: 2.5rem;
+          color: var(--main);
+          cursor: pointer;
+        }
+
+        .EmojiPickerReact {
+          position: absolute;
+          bottom: 6rem;
+          left: 0;
+          z-index: 100;
+        }
       }
 
       .userInput {
@@ -196,7 +156,6 @@
         color: var(--main);
 
         &::placeholder {
-          font-size: 1.8rem;
           font-weight: 300;
           color: var(--main);
         }

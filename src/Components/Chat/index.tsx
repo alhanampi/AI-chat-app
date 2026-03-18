@@ -1,22 +1,58 @@
 import { useEffect, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
+import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 
 import { sendMessageToAPI } from "../../services/chatService";
 
 import type { ChatObject, Message } from "../../utils/types";
-import MarkdownMessage from "../../utils/Markdown";
+import MarkdownMessage from "../../utils/Markdown/index";
+import SideBar from "../SideBar";
 
 import "./styles.scss";
 
 const Chat = () => {
-  const [chats, setChats] = useState<ChatObject[]>([]);
+  const [chats, setChats] = useState<ChatObject[]>(() => {
+    try {
+      const stored = localStorage.getItem("chats");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [inputValue, setInputValue] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>(chats[0]?.messages || []);
-  const [activeChat, setActiveChat] = useState<null | string>(null);
+  const [activeChat, setActiveChat] = useState<null | string>(
+    () => localStorage.getItem("activeChat")
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isDark, setIsDark] = useState(() => document.body.classList.contains("dark"));
 
   // autoscroll
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      setIsDark(document.body.classList.contains("dark"))
+    );
+    observer.observe(document.body, { attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setInputValue((prev) => prev + emojiData.emoji);
+  };
 
   useEffect(() => {
     const activeChatObj = chats.find((chat) => chat.id === activeChat);
@@ -77,7 +113,7 @@ const Chat = () => {
       setMessages(finalMessages);
 
       const finalChats = chats.map((chat) =>
-        chat.id === activeChat ? { ...chat, messages: finalMessages } : chat
+        chat.id === activeChat ? { ...chat, messages: finalMessages } : chat,
       );
 
       setChats(finalChats);
@@ -117,6 +153,29 @@ const Chat = () => {
     setInputValue("");
   };
 
+  const handleDuplicateChat = (id: string) => {
+    const source = chats.find((chat) => chat.id === id);
+    if (!source) return;
+    const duplicate: ChatObject = {
+      ...source,
+      id: uuid(),
+      name: `Copy of ${source.name}`,
+      date: new Date().toLocaleString("en-US"),
+    };
+    setChats((prev) => {
+      const index = prev.findIndex((c) => c.id === id);
+      const updated = [...prev];
+      updated.splice(index + 1, 0, duplicate);
+      return updated;
+    });
+  };
+
+  const handleRenameChat = (id: string, name: string) => {
+    setChats((prev) =>
+      prev.map((chat) => (chat.id === id ? { ...chat, name } : chat))
+    );
+  };
+
   const handleDeleteChat = (id: string) => {
     const updatedChats = chats.filter((chat) => chat.id !== id);
     setChats(updatedChats);
@@ -137,6 +196,15 @@ const Chat = () => {
     }
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem("chats", JSON.stringify(chats));
+  }, [chats]);
+
+  useEffect(() => {
+    if (activeChat) localStorage.setItem("activeChat", activeChat);
+    else localStorage.removeItem("activeChat");
+  }, [activeChat]);
+
   // scroll
   useEffect(() => {
     scrollToBottom();
@@ -144,53 +212,33 @@ const Chat = () => {
 
   return (
     <div className="chatApp">
-      <div className="chatList">
-        <div className="chatListHeader">
-          <h2>Chat List</h2>
-          <i
-            className="bx bx-edit-alt newChat"
-            onClick={() => createNewChat()}
-          ></i>
-        </div>
-
-        {chats &&
-          chats.map((chat) => (
-            <div
-              key={chat.id}
-              className={`chatListItem${
-                chat.id === activeChat ? " active" : ""
-              }`}
-              onClick={() => handleSelectChat(chat.id)}
-            >
-              <h4 className={chat.id === activeChat ? "active" : ""}>
-                {chat.date}
-              </h4>
-              <i
-                className="bx bx-x circle"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteChat(chat.id);
-                }}
-              ></i>
-            </div>
-          ))}
-      </div>
+      <SideBar
+        chats={chats}
+        activeChat={activeChat}
+        onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
+        onNewChat={createNewChat}
+        onDuplicateChat={handleDuplicateChat}
+        onRenameChat={handleRenameChat}
+      />
       <div className="chatWindow">
-        <div className="chatTitle">
-          <h3>Chat with the AI</h3>
-          <i className="bx bx-arrow-back arrow"></i>
-        </div>
+        {messages.length === 0 &&  <div className="chatTitle">
+         <h3>Start a conversation!</h3>
+
+        </div>}
         <div className="chat">
           {messages.map((message, index) => (
-            <div
-              key={index}
-              className={
-                message.type === "prompt" ? "userPrompt" : "aiResponse"
-              }
-            >
-              <MarkdownMessage text={message.text} />
-              <div className="messageTimestamp">{message.timeStamp}</div>
-            </div>
+            <>
+              <div
+                key={index}
+                className={
+                  message.type === "prompt" ? "userPrompt" : "aiResponse"
+                }
+              >
+                <MarkdownMessage text={message.text} />
+              </div>
+              <div className={`messageTimestamp ${message.type === "prompt" ? "messageTimestamp--right" : "messageTimestamp--left"}`}>{message.timeStamp}</div>
+            </>
           ))}
 
           {isLoading && <div className="aiResponse loading">loading...</div>}
@@ -198,7 +246,18 @@ const Chat = () => {
         </div>
 
         <form className="messageForm" onSubmit={(e) => e.preventDefault()}>
-          <i className="fa-solid fa-face-smile emoji"></i>
+          <div className="emojiWrapper" ref={emojiPickerRef}>
+            <i
+              className="fa-solid fa-face-smile emoji"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+            ></i>
+            {showEmojiPicker && (
+              <EmojiPicker
+                onEmojiClick={handleEmojiClick}
+                theme={isDark ? Theme.DARK : Theme.LIGHT}
+              />
+            )}
+          </div>
           <input
             type="text"
             className="userInput"
