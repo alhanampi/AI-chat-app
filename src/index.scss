@@ -61,12 +61,27 @@ html {
       }
     }
 
+    .headerRight {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      padding-right: 2rem;
+
+      .mobileMenuBtn {
+        display: none;
+        font-size: 2.4rem;
+        color: var(--main);
+        cursor: pointer;
+
+        @media (max-width: 800px) {
+          display: inline;
+        }
+      }
+    }
+
     .colorMode {
       display: flex;
       align-items: center;
-      margin: 1rem;
-      justify-self: end;
-      padding-right: 2rem;
 
       .colorText {
         color: var(--text-color-soft);

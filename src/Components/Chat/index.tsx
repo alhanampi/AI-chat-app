@@ -4,13 +4,13 @@ import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 
 import { sendMessageToAPI } from "../../services/chatService";
 
-import type { ChatObject, Message } from "../../utils/types";
+import type { ChatObject, ChatProps, Message } from "../../utils/types";
 import MarkdownMessage from "../../utils/Markdown/index";
 import SideBar from "../SideBar";
 
 import "./styles.scss";
 
-const Chat = () => {
+const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   const [chats, setChats] = useState<ChatObject[]>(() => {
     try {
       const stored = localStorage.getItem("chats");
@@ -21,12 +21,14 @@ const Chat = () => {
   });
   const [inputValue, setInputValue] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>(chats[0]?.messages || []);
-  const [activeChat, setActiveChat] = useState<null | string>(
-    () => localStorage.getItem("activeChat")
+  const [activeChat, setActiveChat] = useState<null | string>(() =>
+    localStorage.getItem("activeChat"),
   );
   const [isLoading, setIsLoading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isDark, setIsDark] = useState(() => document.body.classList.contains("dark"));
+  const [isDark, setIsDark] = useState(() =>
+    document.body.classList.contains("dark"),
+  );
 
   // autoscroll
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -34,7 +36,7 @@ const Chat = () => {
 
   useEffect(() => {
     const observer = new MutationObserver(() =>
-      setIsDark(document.body.classList.contains("dark"))
+      setIsDark(document.body.classList.contains("dark")),
     );
     observer.observe(document.body, { attributeFilter: ["class"] });
     return () => observer.disconnect();
@@ -42,7 +44,10 @@ const Chat = () => {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(e.target as Node)
+      ) {
         setShowEmojiPicker(false);
       }
     };
@@ -61,6 +66,7 @@ const Chat = () => {
 
   const handleSelectChat = (id: string) => {
     setActiveChat(id);
+    onCloseMobile();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,7 +178,7 @@ const Chat = () => {
 
   const handleRenameChat = (id: string, name: string) => {
     setChats((prev) =>
-      prev.map((chat) => (chat.id === id ? { ...chat, name } : chat))
+      prev.map((chat) => (chat.id === id ? { ...chat, name } : chat)),
     );
   };
 
@@ -217,15 +223,21 @@ const Chat = () => {
         activeChat={activeChat}
         onSelectChat={handleSelectChat}
         onDeleteChat={handleDeleteChat}
-        onNewChat={createNewChat}
+        onNewChat={() => {
+          createNewChat();
+          onCloseMobile();
+        }}
         onDuplicateChat={handleDuplicateChat}
         onRenameChat={handleRenameChat}
+        mobileOpen={mobileOpen}
+        onCloseMobile={onCloseMobile}
       />
       <div className="chatWindow">
-        {messages.length === 0 &&  <div className="chatTitle">
-         <h3>Start a conversation!</h3>
-
-        </div>}
+        {messages.length === 0 && (
+          <div className="chatTitle">
+            <h3>Start a conversation!</h3>
+          </div>
+        )}
         <div className="chat">
           {messages.map((message, index) => (
             <>
@@ -237,7 +249,11 @@ const Chat = () => {
               >
                 <MarkdownMessage text={message.text} />
               </div>
-              <div className={`messageTimestamp ${message.type === "prompt" ? "messageTimestamp--right" : "messageTimestamp--left"}`}>{message.timeStamp}</div>
+              <div
+                className={`messageTimestamp ${message.type === "prompt" ? "messageTimestamp--right" : "messageTimestamp--left"}`}
+              >
+                {message.timeStamp}
+              </div>
             </>
           ))}
 

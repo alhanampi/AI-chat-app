@@ -4,6 +4,7 @@ import "./index.scss";
 
 const App = () => {
   const [isDarkMode, setisDarkMode] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     document.body.classList.toggle("light", !isDarkMode);
@@ -16,19 +17,25 @@ const App = () => {
         <h1>
           AI CHATBOT BY PAM! <i className="fa-solid fa-heart"></i>
         </h1>
-        <label className="colorMode">
-          <span className="colorText">Dark Mode</span>
-          <span className="switch">
-            <input
-              type="checkbox"
-              checked={isDarkMode}
-              onChange={() => setisDarkMode((prev) => !prev)}
-            />
-            <span className="slider round"></span>
-          </span>
-        </label>
+        <div className="headerRight">
+          <label className="colorMode">
+            <span className="colorText">Dark Mode</span>
+            <span className="switch">
+              <input
+                type="checkbox"
+                checked={isDarkMode}
+                onChange={() => setisDarkMode((prev) => !prev)}
+              />
+              <span className="slider round"></span>
+            </span>
+          </label>
+          <i
+            className="fa fa-bars mobileMenuBtn"
+            onClick={() => setMobileOpen((prev) => !prev)}
+          ></i>
+        </div>
       </div>
-      <Chat />
+      <Chat mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
     </div>
   );
 };

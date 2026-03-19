@@ -69,6 +69,20 @@
     }
   }
 
+  .mobileCloseBtn {
+    display: none;
+
+    @media (max-width: 800px) {
+      display: inline;
+    }
+  }
+
+  .headerActions {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
   i {
     font-size: 2.5rem;
     color: var(--text-color-soft);
@@ -77,6 +91,21 @@
 
     &:hover {
       color: var(--text-color);
+    }
+  }
+
+  @media (max-width: 800px) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100%;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+
+    &.mobileOpen {
+      transform: translateX(0);
     }
   }
 
@@ -92,6 +121,10 @@
 
     &:hover {
       background: var(--main);
+    }
+
+    @media (max-width: 800px) {
+      display: none;
     }
   }
 }

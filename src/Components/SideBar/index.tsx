@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { ChatObject } from "../../utils/types";
+import type { ChatObject, SideBarProps } from "../../utils/types";
 
 import "./styles.scss";
-
-type SideBarProps = {
-  chats: ChatObject[];
-  activeChat: string | null;
-  onSelectChat: (id: string) => void;
-  onDeleteChat: (id: string) => void;
-  onNewChat: () => void;
-  onRenameChat: (id: string, name: string) => void;
-  onDuplicateChat: (id: string) => void;
-};
 
 const SideBar = ({
   chats,
@@ -22,6 +12,8 @@ const SideBar = ({
   onNewChat,
   onRenameChat,
   onDuplicateChat,
+  mobileOpen,
+  onCloseMobile,
 }: SideBarProps) => {
   // resizable sidebar
   const [width, setWidth] = useState(() => window.innerWidth / 3);
@@ -78,10 +70,24 @@ const SideBar = ({
   };
 
   return (
-    <div className="chatList" style={{ width }}>
+    <div
+      className={`chatList${mobileOpen ? " mobileOpen" : ""}`}
+      style={{ width }}
+    >
       <div className="chatListHeader">
         <h2>Chat List</h2>
-        <i className="fa fa-plus-circle" title="New conversation" onClick={() => onNewChat()}></i>
+        <div className="headerActions">
+          <i
+            className="fa fa-plus-circle"
+            title="New conversation"
+            onClick={() => onNewChat()}
+          ></i>
+          <i
+            className="bx bx-x circle mobileCloseBtn"
+            title="Close menu"
+            onClick={onCloseMobile}
+          ></i>
+        </div>
       </div>
 
       {chats &&
@@ -106,8 +112,16 @@ const SideBar = ({
                   autoFocus
                 />
                 <div className="chatListItemActions">
-                  <i className="fa fa-check" title="Save changes" onClick={saveEdit}></i>
-                  <i className="fa fa-times" title="Cancel" onClick={cancelEdit}></i>
+                  <i
+                    className="fa fa-check"
+                    title="Save changes"
+                    onClick={saveEdit}
+                  ></i>
+                  <i
+                    className="fa fa-times"
+                    title="Cancel"
+                    onClick={cancelEdit}
+                  ></i>
                 </div>
               </>
             ) : (
@@ -116,8 +130,19 @@ const SideBar = ({
                   {chat.name || chat.date}
                 </h4>
                 <div className="chatListItemActions">
-                  <i className="bx bx-edit-alt" title="Edit name" onClick={(e) => startEditing(e, chat)}></i>
-                  <i className="fa fa-clone" title="Duplicate this conversation" onClick={(e) => { e.stopPropagation(); onDuplicateChat(chat.id); }}></i>
+                  <i
+                    className="bx bx-edit-alt"
+                    title="Edit name"
+                    onClick={(e) => startEditing(e, chat)}
+                  ></i>
+                  <i
+                    className="fa fa-clone"
+                    title="Duplicate this conversation"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDuplicateChat(chat.id);
+                    }}
+                  ></i>
                   <i
                     className="bx bx-x circle"
                     title="Delete this conversation"

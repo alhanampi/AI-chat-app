@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import {
+  oneDark,
+  oneLight,
+} from "react-syntax-highlighter/dist/esm/styles/prism";
 
 import "./styles.scss";
 
 const useDarkMode = () => {
   const [isDark, setIsDark] = useState(() =>
-    document.body.classList.contains("dark")
+    document.body.classList.contains("dark"),
   );
 
   useEffect(() => {
@@ -53,7 +56,10 @@ const MarkdownMessage = ({ text }: { text: string }) => {
             return !inline ? (
               <div className="codeBlock">
                 <CopyButton code={codeString} />
-                <SyntaxHighlighter language={match?.[1] || "javascript"} style={isDark ? oneDark : oneLight}>
+                <SyntaxHighlighter
+                  language={match?.[1] || "javascript"}
+                  style={isDark ? oneDark : oneLight}
+                >
                   {codeString}
                 </SyntaxHighlighter>
               </div>
