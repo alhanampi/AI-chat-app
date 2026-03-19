@@ -11,6 +11,23 @@ export interface Message {
   timeStamp: string;
 }
 
+export type ConfirmPopupProps = {
+  open: boolean;
+  message: string;
+  confirmLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+export type ChatCardProps = {
+  chat: ChatObject;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onRename: (name: string) => void;
+  onDuplicate: () => void;
+};
+
 export type ChatProps = {
   mobileOpen: boolean;
   onCloseMobile: () => void;
