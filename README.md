@@ -6,7 +6,7 @@ A fully functional AI chat application built to demonstrate frontend engineering
 
 ## Features
 
-- **AI conversations** powered by Groq (Llama 3.1) via a custom Express backend
+- **AI conversations** powered by Groq (Llama 3.1) via a Vercel Serverless Function
 - **Multiple conversations** — create, rename, duplicate, and delete chats
 - **Persistent sessions** — conversations and active chat saved to localStorage
 - **Markdown rendering** — AI responses render with full markdown support: code blocks with syntax highlighting, tables, blockquotes, headings, and lists
@@ -39,15 +39,12 @@ A fully functional AI chat application built to demonstrate frontend engineering
 
 **Backend**
 
-The backend is a lightweight Express server that proxies requests to the Groq API.
-Repository: [AI-chat-app-backend](https://github.com/alhanampi/AI-chat-app-backend)
+The API runs as a Vercel Serverless Function (`api/chat.js`) — no separate server required.
 
 | | |
 |---|---|
-| Node.js + Express | REST API server |
+| Vercel Serverless Functions | API handler |
 | Groq SDK | LLM inference (Llama 3.1 8B) |
-| dotenv | Environment variable management |
-| CORS | Cross-origin request handling |
 
 ---
 
@@ -63,21 +60,15 @@ Repository: [AI-chat-app-backend](https://github.com/alhanampi/AI-chat-app-backe
 
 ## Running Locally
 
-**Backend**
-
 ```bash
-cd AI-chat-app-backend
-npm install
-# create .env with GROQ_API_KEY=your_key
-npm start
-```
-
-**Frontend**
-
-```bash
-cd AI-chat-app
 npm install
 npm run dev
 ```
 
-The frontend expects the backend at `http://localhost:3001`.
+Create a `.env.local` file in the root:
+
+```
+GROQ_API_KEY=your_key_here
+```
+
+Get a free API key at [console.groq.com](https://console.groq.com).
