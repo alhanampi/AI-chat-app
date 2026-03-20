@@ -39,11 +39,14 @@ A fully functional AI chat application built to demonstrate frontend engineering
 
 **Backend**
 
-The API runs as a Vercel Serverless Function (`api/chat.js`) — no separate server required.
+In production (Vercel), the API runs as a Serverless Function (`api/chat.js`) — no separate server needed.
+
+For local development, the frontend proxies `/api` requests to a local Express server. See [AI-chat-app-backend](https://github.com/alhanampi/AI-chat-app-backend).
 
 | | |
 |---|---|
-| Vercel Serverless Functions | API handler |
+| Vercel Serverless Functions | API handler (production) |
+| Node.js + Express | Local development server |
 | Groq SDK | LLM inference (Llama 3.1 8B) |
 
 ---
@@ -60,15 +63,35 @@ The API runs as a Vercel Serverless Function (`api/chat.js`) — no separate ser
 
 ## Running Locally
 
+### 1. Backend
+
+Clone and start the [backend repo](https://github.com/alhanampi/AI-chat-app-backend):
+
 ```bash
+git clone https://github.com/alhanampi/AI-chat-app-backend
+cd AI-chat-app-backend
 npm install
-npm run dev
 ```
 
-Create a `.env.local` file in the root:
+Create a `.env` file:
 
 ```
 GROQ_API_KEY=your_key_here
 ```
 
 Get a free API key at [console.groq.com](https://console.groq.com).
+
+```bash
+node server.js
+```
+
+The backend runs on `http://localhost:3001`.
+
+### 2. Frontend
+
+```bash
+npm install
+npm run dev
+```
+
+Vite proxies `/api` requests to the local backend automatically.
