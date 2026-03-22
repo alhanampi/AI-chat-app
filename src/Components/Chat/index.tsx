@@ -33,6 +33,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   // autoscroll
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     const observer = new MutationObserver(() =>
@@ -69,9 +70,17 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
     onCloseMobile();
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(e.target.value);
   };
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight);
+    textarea.style.height = `${Math.min(textarea.scrollHeight, lineHeight * 5)}px`;
+  }, [inputValue]);
 
   const handleSendMessage = async () => {
     if (inputValue.trim() === "") return;
@@ -130,8 +139,8 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
     setIsLoading(false);
   };
 
-  const handleKeyDown = (e: { key: string; preventDefault: () => void }) => {
-    if (e.key === "Enter") {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -274,13 +283,14 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
               />
             )}
           </div>
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             className="userInput"
             placeholder="start typing here!"
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            rows={1}
           />
           <i
             className="fa-solid fa-paper-plane"

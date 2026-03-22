@@ -32,15 +32,22 @@
   font-family: "Outfit", sans-serif;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
 html {
   font-size: 62.5%;
 }
 
 .appContainer {
   width: 100%;
-  height: 100vh;
-  display: grid;
-  place-items: center;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background-color: var(--bg-color);
 
   .headerContainer {
@@ -49,14 +56,25 @@ html {
     width: 100%;
     flex-direction: row;
     flex-wrap: nowrap;
+    flex-shrink: 0;
     justify-content: space-between;
-    padding: 0 2rem;
+    padding: 2rem;
+
+    @media (max-width: 800px) {
+      padding: 1rem;
+    }
 
     h1 {
       color: var(--text-color);
       font-size: 2.4rem;
       font-weight: 500;
       letter-spacing: 0.15rem;
+      white-space: nowrap;
+
+      @media (max-width: 400px) {
+        font-size: 1.8rem;
+        letter-spacing: 0.05rem;
+      }
 
       i {
         color: var(--main);
@@ -90,6 +108,10 @@ html {
         font-size: 1.6rem;
         font-weight: 300;
         margin-right: 1rem;
+
+        @media (max-width: 800px) {
+          display: none;
+        }
       }
 
       .switch {
@@ -101,6 +123,11 @@ html {
         border-radius: 34px;
         background-color: var(--switch-inactive);
         transition: 0.3s;
+
+        @media (max-width: 800px) {
+          width: 46px;
+          height: 26px;
+        }
 
         &:has(input:checked) {
           background-color: var(--switch-active);
@@ -118,10 +145,19 @@ html {
           border-radius: 50%;
           background: white;
           transition: 0.3s;
+
+          @media (max-width: 800px) {
+            width: 20px;
+            height: 20px;
+          }
         }
 
         input:checked + .slider {
           transform: translateX(26px);
+
+          @media (max-width: 800px) {
+            transform: translateX(18px);
+          }
         }
       }
     }
