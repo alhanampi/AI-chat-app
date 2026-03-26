@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -6,8 +6,17 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { hasNonLatinScript } from "../types";
 
 import "./styles.scss";
+
+const getChildrenText = (children: React.ReactNode): string => {
+  if (typeof children === "string") return children;
+  if (Array.isArray(children)) return children.map(getChildrenText).join("");
+  if (React.isValidElement(children))
+    return getChildrenText((children.props as any).children);
+  return "";
+};
 
 const useDarkMode = () => {
   const [isDark, setIsDark] = useState(() =>
@@ -41,11 +50,18 @@ const CopyButton = ({ code }: { code: string }) => {
   );
 };
 
-const MarkdownMessage = ({ text }: { text: string }) => {
+const MarkdownMessage = ({
+  text,
+  nonLatin,
+}: {
+  text: string;
+  nonLatin?: boolean;
+}) => {
   const isDark = useDarkMode();
 
   return (
-    <div className="markdown">
+    <div className={`markdown${nonLatin ? " markdown--nonLatin" : ""}`}>
+      {nonLatin && <span className="nonLatinBadge">🌐 non-latin script</span>}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -79,6 +95,41 @@ const MarkdownMessage = ({ text }: { text: string }) => {
           h1: ({ children }: any) => <h1 className="mdH1">{children}</h1>,
           h2: ({ children }: any) => <h2 className="mdH2">{children}</h2>,
           h3: ({ children }: any) => <h3 className="mdH3">{children}</h3>,
+          ...(nonLatin && {
+            p: ({ children }: any) => (
+              <p
+                className={
+                  hasNonLatinScript(getChildrenText(children))
+                    ? "nonLatinContent"
+                    : undefined
+                }
+              >
+                {children}
+              </p>
+            ),
+            ol: ({ children }: any) => (
+              <ol
+                className={
+                  hasNonLatinScript(getChildrenText(children))
+                    ? "nonLatinContent"
+                    : undefined
+                }
+              >
+                {children}
+              </ol>
+            ),
+            ul: ({ children }: any) => (
+              <ul
+                className={
+                  hasNonLatinScript(getChildrenText(children))
+                    ? "nonLatinContent"
+                    : undefined
+                }
+              >
+                {children}
+              </ul>
+            ),
+          }),
         }}
       >
         {text}

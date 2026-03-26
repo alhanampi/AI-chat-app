@@ -5,6 +5,7 @@ import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 import { sendMessageToAPI } from "../../services/chatService";
 
 import type { ChatObject, ChatProps, Message } from "../../utils/types";
+import { hasNonLatinScript } from "../../utils/types";
 import MarkdownMessage from "../../utils/Markdown/index";
 import SideBar from "../SideBar";
 
@@ -252,11 +253,22 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
             <>
               <div
                 key={index}
-                className={
-                  message.type === "prompt" ? "userPrompt" : "aiResponse"
-                }
+                className={[
+                  message.type === "prompt" ? "userPrompt" : "aiResponse",
+                  message.type === "response" && hasNonLatinScript(message.text)
+                    ? "aiResponse--nonLatin"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
-                <MarkdownMessage text={message.text} />
+                <MarkdownMessage
+                  text={message.text}
+                  nonLatin={
+                    message.type === "response" &&
+                    hasNonLatinScript(message.text)
+                  }
+                />
               </div>
               <div
                 className={`messageTimestamp ${message.type === "prompt" ? "messageTimestamp--right" : "messageTimestamp--left"}`}

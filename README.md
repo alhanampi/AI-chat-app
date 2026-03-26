@@ -1,5 +1,7 @@
 # AI Chat App
 
+**[Live demo →](https://ai-chat-app-flax-eight.vercel.app/)**
+
 A fully functional AI chat application built to demonstrate frontend engineering skills — component architecture, state management, responsive design, and real-time AI integration.
 
 ---
