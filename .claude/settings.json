@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "The following tool was just used: $ARGUMENTS\n\nCheck the file_path in the tool input. If it does NOT include a 'docs' directory segment (i.e., the file is not inside a docs/ folder), stop immediately and do nothing.\n\nIf the file IS inside docs/:\n1. List every .md file currently in docs/\n2. Read each one to understand what it documents (a sentence is enough)\n3. Rewrite the ## Docs section in CLAUDE.md so it lists every doc file as a relative markdown link with a one-line description:\n   - [`docs/filename.md`](docs/filename.md) — what this doc covers\n4. Leave every other section in CLAUDE.md exactly as-is — only replace the lines between the ## Docs heading and the next ## heading",
+            "statusMessage": "Syncing docs index in CLAUDE.md...",
+            "async": true,
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
