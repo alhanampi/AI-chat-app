@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { ChatObject } from "../utils/types";
+import type { ChatObject, Message } from "../utils/types";
 
 type GetToken = () => Promise<string | null>;
 
@@ -8,10 +8,22 @@ async function authHeaders(getToken: GetToken) {
   return { Authorization: `Bearer ${token}` };
 }
 
+// ── Guest (unauthenticated) ───────────────────────────────────────────────────
+
+export async function sendMessageGuest(
+  message: string,
+  history: Message[],
+): Promise<string> {
+  const { data } = await axios.post("/api/chat", { message, history });
+  return data.reply;
+}
+
+// ── Authenticated ─────────────────────────────────────────────────────────────
+
 export async function fetchConversations(getToken: GetToken): Promise<ChatObject[]> {
   const headers = await authHeaders(getToken);
   const { data } = await axios.get("/api/conversations", { headers });
-  return data.map((c: { id: string; name: string; created_at: string; updated_at: string }) => ({
+  return data.map((c: { id: string; name: string; created_at: string }) => ({
     id: c.id,
     name: c.name,
     date: c.created_at,
@@ -19,13 +31,10 @@ export async function fetchConversations(getToken: GetToken): Promise<ChatObject
   }));
 }
 
-export async function fetchMessages(
-  conversationId: string,
-  getToken: GetToken,
-) {
+export async function fetchMessages(conversationId: string, getToken: GetToken) {
   const headers = await authHeaders(getToken);
   const { data } = await axios.get(`/api/conversations/${conversationId}`, { headers });
-  return data as { id: string; type: "prompt" | "response"; text: string; timestamp: string }[];
+  return data as { type: "prompt" | "response"; text: string; timestamp: string }[];
 }
 
 export async function sendMessage(
@@ -38,11 +47,7 @@ export async function sendMessage(
   return data;
 }
 
-export async function renameConversation(
-  id: string,
-  name: string,
-  getToken: GetToken,
-) {
+export async function renameConversation(id: string, name: string, getToken: GetToken) {
   const headers = await authHeaders(getToken);
   const { data } = await axios.put(`/api/conversations/${id}`, { name }, { headers });
   return data;
@@ -55,18 +60,11 @@ export async function deleteConversation(id: string, getToken: GetToken) {
 
 export async function duplicateConversation(id: string, getToken: GetToken) {
   const headers = await authHeaders(getToken);
-  const { data } = await axios.post(
-    `/api/conversations/${id}/duplicate`,
-    {},
-    { headers },
-  );
-  return data as { id: string; name: string; created_at: string; updated_at: string };
+  const { data } = await axios.post(`/api/conversations/${id}/duplicate`, {}, { headers });
+  return data as { id: string; name: string; created_at: string };
 }
 
-export async function migrateLocalStorage(
-  chats: ChatObject[],
-  getToken: GetToken,
-) {
+export async function migrateLocalStorage(chats: ChatObject[], getToken: GetToken) {
   const headers = await authHeaders(getToken);
   await axios.post("/api/migrate", { chats }, { headers });
 }

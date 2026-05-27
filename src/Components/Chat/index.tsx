@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { v4 as uuid } from "uuid";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
 
 import {
@@ -10,6 +11,7 @@ import {
   migrateLocalStorage,
   renameConversation,
   sendMessage,
+  sendMessageGuest,
 } from "../../services/chatService";
 
 import type { ChatObject, ChatProps, Message } from "../../utils/types";
@@ -53,7 +55,7 @@ const SpeakButton = ({ text }: { text: string }) => {
 };
 
 const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
-  const { getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const [chats, setChats] = useState<ChatObject[]>([]);
   const [inputValue, setInputValue] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,6 +70,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const wasSignedOut = useRef(false);
 
   useEffect(() => {
     const observer = new MutationObserver(() =>
@@ -90,51 +93,93 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Load conversations on mount, migrate localStorage if needed
+  // Initialize based on auth state; handle guest → signed-in migration
   useEffect(() => {
-    async function init() {
+    if (!isLoaded) return;
+
+    if (isSignedIn) {
+      const migrate = wasSignedOut.current;
+      wasSignedOut.current = false;
+
       setIsInitializing(true);
-      try {
-        const dbChats = await fetchConversations(getToken);
+      (async () => {
+        try {
+          const dbChats = await fetchConversations(getToken);
 
-        const stored = localStorage.getItem("chats");
-        if (stored && dbChats.length === 0) {
-          try {
-            const localChats: ChatObject[] = JSON.parse(stored);
-            if (localChats.length > 0) {
-              await migrateLocalStorage(localChats, getToken);
-              localStorage.removeItem("chats");
-              localStorage.removeItem("activeChat");
-              const migrated = await fetchConversations(getToken);
-              setChats(migrated);
-              if (migrated.length > 0) setActiveChat(migrated[0].id);
+          if (migrate) {
+            // User just signed in — migrate any guest localStorage chats
+            const stored = localStorage.getItem("chats");
+            if (stored && dbChats.length === 0) {
+              const localChats: ChatObject[] = JSON.parse(stored);
+              if (localChats.length > 0) {
+                await migrateLocalStorage(localChats, getToken);
+                localStorage.removeItem("chats");
+                localStorage.removeItem("activeChat");
+                const migrated = await fetchConversations(getToken);
+                setChats(migrated);
+                setActiveChat(migrated.length > 0 ? migrated[0].id : null);
+                return;
+              }
             }
-          } catch {
-            setChats(dbChats);
+            localStorage.removeItem("chats");
+            localStorage.removeItem("activeChat");
           }
-        } else {
-          setChats(dbChats);
-          if (dbChats.length > 0) setActiveChat(dbChats[0].id);
-        }
-      } finally {
-        setIsInitializing(false);
-      }
-    }
-    init();
-  }, []);
 
-  // Load messages when active chat changes
-  useEffect(() => {
-    if (!activeChat) {
-      setMessages([]);
-      return;
+          setChats(dbChats);
+          setActiveChat(dbChats.length > 0 ? dbChats[0].id : null);
+          setMessages([]);
+        } finally {
+          setIsInitializing(false);
+        }
+      })();
+    } else {
+      // Guest mode — load from localStorage
+      wasSignedOut.current = true;
+      try {
+        const stored = localStorage.getItem("chats");
+        const localChats: ChatObject[] = stored ? JSON.parse(stored) : [];
+        setChats(localChats);
+        const lastActive = localStorage.getItem("activeChat");
+        const first = localChats.find((c) => c.id === lastActive) ?? localChats[0];
+        setActiveChat(first?.id ?? null);
+        setMessages(first?.messages ?? []);
+      } catch {
+        setChats([]);
+        setActiveChat(null);
+        setMessages([]);
+      }
+      setIsInitializing(false);
     }
+  }, [isLoaded, isSignedIn]);
+
+  // Load messages from DB when active chat changes (auth mode only)
+  useEffect(() => {
+    if (!isSignedIn || !activeChat) return;
     fetchMessages(activeChat, getToken).then((rows) => {
       setMessages(
         rows.map((r) => ({ type: r.type, text: r.text, timeStamp: r.timestamp })),
       );
     });
-  }, [activeChat]);
+  }, [activeChat, isSignedIn]);
+
+  // Persist guest chats to localStorage
+  useEffect(() => {
+    if (!isLoaded || isSignedIn) return;
+    localStorage.setItem("chats", JSON.stringify(chats));
+  }, [chats, isSignedIn, isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded || isSignedIn) return;
+    if (activeChat) localStorage.setItem("activeChat", activeChat);
+    else localStorage.removeItem("activeChat");
+  }, [activeChat, isSignedIn, isLoaded]);
+
+  // Keep guest messages in sync with chats state
+  useEffect(() => {
+    if (isSignedIn) return;
+    const activeChatObj = chats.find((c) => c.id === activeChat);
+    if (activeChatObj) setMessages(activeChatObj.messages);
+  }, [activeChat, chats, isSignedIn]);
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     setInputValue((prev) => prev + emojiData.emoji);
@@ -166,44 +211,90 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       timeStamp: new Date().toLocaleString("en-US"),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsLoading(true);
 
-    try {
-      const { reply, conversationId } = await sendMessage(
-        userMessage.text,
-        activeChat,
-        getToken,
-      );
+    if (!isSignedIn) {
+      // ── Guest mode ──────────────────────────────────────────────────────────
+      let targetChat = activeChat;
+      let updatedChats = chats;
 
-      const aiMessage: Message = {
-        type: "response",
-        text: reply,
-        timeStamp: new Date().toLocaleString("en-US"),
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
-
-      if (!activeChat) {
-        // New conversation was created — refresh list and set it as active
-        setActiveChat(conversationId);
-        const updated = await fetchConversations(getToken);
-        setChats(updated);
+      if (!targetChat) {
+        const newChat: ChatObject = {
+          id: uuid(),
+          date: new Date().toLocaleString("en-US"),
+          messages: [userMessage],
+          name: `Conversation ${chats.length + 1}`,
+        };
+        updatedChats = [newChat, ...chats];
+        setChats(updatedChats);
+        setActiveChat(newChat.id);
+        targetChat = newChat.id;
+        setMessages([userMessage]);
       } else {
-        // Bubble the updated conversation to the top of the list
-        setChats((prev) => {
-          const idx = prev.findIndex((c) => c.id === conversationId);
-          if (idx === -1) return prev;
-          const updated = [...prev];
-          const [moved] = updated.splice(idx, 1);
-          return [moved, ...updated];
-        });
+        const updatedMessages = [...messages, userMessage];
+        setMessages(updatedMessages);
+        updatedChats = chats.map((c) =>
+          c.id === targetChat ? { ...c, messages: updatedMessages } : c,
+        );
+        setChats(updatedChats);
       }
-    } catch (error) {
-      console.error(error);
-      // Roll back the optimistic user message on error
-      setMessages((prev) => prev.slice(0, -1));
+
+      try {
+        const reply = await sendMessageGuest(inputValue, messages);
+        const aiMessage: Message = {
+          type: "response",
+          text: reply,
+          timeStamp: new Date().toLocaleString("en-US"),
+        };
+        const finalMessages = [
+          ...(targetChat === activeChat ? messages : [userMessage]),
+          aiMessage,
+        ];
+        setMessages((prev) => [...prev, aiMessage]);
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === targetChat ? { ...c, messages: finalMessages } : c,
+          ),
+        );
+      } catch (error) {
+        console.error(error);
+        setMessages((prev) => prev.filter((m) => m !== userMessage));
+      }
+    } else {
+      // ── Auth mode ───────────────────────────────────────────────────────────
+      setMessages((prev) => [...prev, userMessage]);
+
+      try {
+        const { reply, conversationId } = await sendMessage(
+          userMessage.text,
+          activeChat,
+          getToken,
+        );
+        const aiMessage: Message = {
+          type: "response",
+          text: reply,
+          timeStamp: new Date().toLocaleString("en-US"),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+
+        if (!activeChat) {
+          setActiveChat(conversationId);
+          const updated = await fetchConversations(getToken);
+          setChats(updated);
+        } else {
+          setChats((prev) => {
+            const idx = prev.findIndex((c) => c.id === conversationId);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            const [moved] = next.splice(idx, 1);
+            return [moved, ...next];
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        setMessages((prev) => prev.slice(0, -1));
+      }
     }
 
     setIsLoading(false);
@@ -217,36 +308,63 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   };
 
   const createNewChat = () => {
-    setActiveChat(null);
-    setMessages([]);
+    if (!isSignedIn) {
+      const newChat: ChatObject = {
+        id: uuid(),
+        date: new Date().toLocaleString("en-US"),
+        messages: [],
+        name: `Conversation ${chats.length + 1}`,
+      };
+      setChats((prev) => [newChat, ...prev]);
+      setActiveChat(newChat.id);
+    } else {
+      setActiveChat(null);
+      setMessages([]);
+    }
     onCloseMobile();
   };
 
   const handleDuplicateChat = async (id: string) => {
-    const newConv = await duplicateConversation(id, getToken);
     const idx = chats.findIndex((c) => c.id === id);
-    const duplicate: ChatObject = {
-      id: newConv.id,
-      name: newConv.name,
-      date: newConv.created_at,
-      messages: [],
-    };
-    setChats((prev) => {
-      const updated = [...prev];
-      updated.splice(idx + 1, 0, duplicate);
-      return updated;
-    });
+
+    if (!isSignedIn) {
+      const source = chats[idx];
+      const duplicate: ChatObject = {
+        ...source,
+        id: uuid(),
+        name: `Copy of ${source.name}`,
+        date: new Date().toLocaleString("en-US"),
+      };
+      setChats((prev) => {
+        const next = [...prev];
+        next.splice(idx + 1, 0, duplicate);
+        return next;
+      });
+    } else {
+      const newConv = await duplicateConversation(id, getToken);
+      const duplicate: ChatObject = {
+        id: newConv.id,
+        name: newConv.name,
+        date: newConv.created_at,
+        messages: [],
+      };
+      setChats((prev) => {
+        const next = [...prev];
+        next.splice(idx + 1, 0, duplicate);
+        return next;
+      });
+    }
   };
 
   const handleRenameChat = async (id: string, name: string) => {
     setChats((prev) =>
-      prev.map((chat) => (chat.id === id ? { ...chat, name } : chat)),
+      prev.map((c) => (c.id === id ? { ...c, name } : c)),
     );
-    await renameConversation(id, name, getToken);
+    if (isSignedIn) await renameConversation(id, name, getToken);
   };
 
   const handleDeleteChat = async (id: string) => {
-    await deleteConversation(id, getToken);
+    if (isSignedIn) await deleteConversation(id, getToken);
     const remaining = chats.filter((c) => c.id !== id);
     setChats(remaining);
     if (id === activeChat) {
@@ -254,20 +372,16 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
     }
   };
 
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  if (isInitializing) {
+  if (!isLoaded || isInitializing) {
     return (
       <div className="chatApp">
         <div className="chatWindow">
           <div className="chatTitle">
-            <h3>Loading your conversations...</h3>
+            <h3>Loading...</h3>
           </div>
         </div>
       </div>
@@ -288,7 +402,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
         onCloseMobile={onCloseMobile}
       />
       <div className="chatWindow">
-        {messages.length === 0 && !isInitializing && (
+        {messages.length === 0 && (
           <div className="chatTitle">
             <h3>Start a conversation!</h3>
           </div>

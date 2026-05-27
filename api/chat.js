@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
 import { sql } from "./_db.js";
-import { getUserId } from "./_auth.js";
+import { tryGetUserId } from "./_auth.js";
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -9,14 +9,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  let userId;
-  try {
-    userId = await getUserId(req);
-  } catch {
-    return res.status(401).json({ error: "Unauthorized" });
+  const userId = await tryGetUserId(req);
+  const { message, conversationId, history = [] } = req.body;
+
+  // Guest mode: no DB, just call Groq with the history sent from the client
+  if (!userId) {
+    const groqMessages = [
+      ...history.map((m) => ({
+        role: m.type === "prompt" ? "user" : "assistant",
+        content: m.text,
+      })),
+      { role: "user", content: message },
+    ];
+    try {
+      const completion = await client.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        messages: groqMessages,
+      });
+      return res.json({ reply: completion.choices[0].message.content });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: "Error with Groq" });
+    }
   }
 
-  const { message, conversationId } = req.body;
+  // Authenticated mode: save to DB and use DB history
   let convId = conversationId;
 
   if (!convId) {
@@ -39,13 +56,13 @@ export default async function handler(req, res) {
     VALUES (${convId}, 'prompt', ${message}, ${timestamp})
   `;
 
-  const history = await sql`
+  const dbHistory = await sql`
     SELECT type, text FROM messages
     WHERE conversation_id = ${convId}
     ORDER BY created_at ASC
   `;
 
-  const groqMessages = history.map((m) => ({
+  const groqMessages = dbHistory.map((m) => ({
     role: m.type === "prompt" ? "user" : "assistant",
     content: m.text,
   }));

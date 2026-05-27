@@ -12,3 +12,17 @@ export async function getUserId(req) {
   });
   return payload.sub;
 }
+
+// Returns null instead of throwing — for endpoints that support guest access
+export async function tryGetUserId(req) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return null;
+  try {
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+    return payload.sub;
+  } catch {
+    return null;
+  }
+}
