@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { v4 as uuid } from "uuid";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
@@ -409,9 +409,8 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
         )}
         <div className="chat">
           {messages.map((message, index) => (
-            <>
+            <Fragment key={index}>
               <div
-                key={index}
                 className={[
                   message.type === "prompt" ? "userPrompt" : "aiResponse",
                   message.type === "response" && hasNonLatinScript(message.text)
@@ -435,14 +434,18 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
                 <SpeakButton text={message.text} />
                 {message.timeStamp}
               </div>
-            </>
+            </Fragment>
           ))}
 
           {isLoading && <div className="aiResponse loading">loading...</div>}
           <div ref={chatEndRef} />
         </div>
 
-        <form className="messageForm" onSubmit={(e) => e.preventDefault()}>
+        <form
+          className="messageForm"
+          onSubmit={(e) => e.preventDefault()}
+          onClick={() => textareaRef.current?.focus()}
+        >
           <div className="emojiWrapper" ref={emojiPickerRef}>
             <i
               className="fa-solid fa-face-smile emoji"
@@ -463,6 +466,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             rows={1}
+            autoFocus
           />
           <i
             className="fa-solid fa-paper-plane"

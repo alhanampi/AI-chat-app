@@ -36,7 +36,13 @@ const App = () => {
             </SignInButton>
           </SignedOut>
           <SignedIn>
-            <UserButton />
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: { width: "34px", height: "34px" },
+                },
+              }}
+            />
           </SignedIn>
           <i
             className="fa fa-bars mobileMenuBtn"

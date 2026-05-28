@@ -181,3 +181,14 @@ html {
     }
   }
 }
+
+.cl-modalContent {
+  .cl-rootBox {
+    margin: 0 auto;
+    width: min(560px, 96vw);
+  }
+
+  .cl-card {
+    width: 100%;
+  }
+}

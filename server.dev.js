@@ -1,7 +1,7 @@
 import express from "express";
 import chatHandler from "./api/chat.js";
 import conversationsHandler from "./api/conversations.js";
-import conversationByIdHandler from "./api/conversations/[id].js";
+import conversationByIdHandler from "./api/conversations/[id]/index.js";
 import duplicateHandler from "./api/conversations/[id]/duplicate.js";
 import migrateHandler from "./api/migrate.js";
 
