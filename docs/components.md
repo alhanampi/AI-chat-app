@@ -1,60 +1,72 @@
 # Component Standards
 
-## File structure
+## Folder structure
 
-Each component is a single file with one default export. Styled components are defined above the component function in the same file — no separate `styles.ts` files.
+Each component lives in its own subfolder under `src/Components/`. Each folder contains exactly two files:
 
 ```
-src/components/
-  Hero.tsx         ← full-page section, no props
-  Nav.tsx          ← full-page section, no props
-  Projects.tsx     ← full-page section, no props
-  ProjectCard.tsx  ← leaf component, receives typed props
-  Skills.tsx
-  Experience.tsx
-  Contact.tsx
+src/
+  Components/
+    Chat/
+      index.tsx      ← all state, event handlers, and JSX
+      styles.scss    ← component-scoped styles
+    SideBar/
+      index.tsx
+      styles.scss
+    ChatCard/
+      index.tsx
+      styles.scss
+    ConfirmPopup/
+      index.tsx
+      styles.scss
+  utils/
+    types.ts         ← shared TypeScript interfaces
+    Markdown/
+      index.tsx      ← MarkdownMessage renderer
+      styles.scss
+  services/
+    chatService.ts   ← all API calls
 ```
 
-## Section components vs. leaf components
+## Component map
 
-**Section components** (Hero, Nav, Projects, Skills, Experience, Contact) map to a single page section. They:
+### `App`
+Root shell. Owns dark/light mode toggle state and mobile sidebar open state. Renders the header (title, dark mode switch, Clerk auth buttons, mobile menu icon) and mounts `<Chat>`.
 
-- Take no props
-- Import their content directly from `src/data/`
-- Are rendered once in `App.tsx`
+### `Chat`
+The main orchestrator. Owns all application state: `chats`, `messages`, `activeChat`, `isLoading`, `isInitializing`, `inputValue`. Handles auth vs. guest branching, message sending, conversation CRUD, and localStorage persistence. Passes props down to `SideBar`.
 
-**Leaf components** (ProjectCard) are reusable units rendered inside a section. They:
+### `SideBar`
+Displays the conversation list and the new-chat button. Width is user-resizable via a drag handle. On mobile it slides in as an overlay. Renders one `ChatCard` per conversation.
 
-- Receive typed props via a colocated `interface Props { ... }` block
-- Do not import from `src/data/` directly
+### `ChatCard`
+Renders a single conversation entry. Shows the conversation name, message count, and action icons (rename, duplicate, delete). Inline rename uses a controlled input. Destructive and ambiguous actions route through `ConfirmPopup`.
 
-```ts
-// leaf component — typed props, no data imports
-interface Props {
-  project: Project
-  index:   number
-}
+### `ConfirmPopup`
+A modal built with `reactjs-popup`. Accepts `open`, `message`, `confirmLabel`, `onConfirm`, and `onCancel`. Used by `ChatCard` for delete, duplicate, rename-save, and rename-cancel confirmations.
 
-export default function ProjectCard({ project, index }: Props) { ... }
-```
+### `MarkdownMessage` (`src/utils/Markdown/index.tsx`)
+Renders AI response text as Markdown using `react-markdown` with `remark-gfm` and `react-syntax-highlighter` for code blocks. Accepts a `nonLatin` flag that adjusts font rendering for CJK/Arabic/Hebrew/etc. scripts.
 
-## Adding a new section
+### `SpeakButton` (defined inside `Chat/index.tsx`)
+A small icon button that uses the Web Speech API (`SpeechSynthesisUtterance`) to read a message aloud. Strips Markdown formatting before speaking. Toggles between play and stop state.
 
-1. Create `src/components/MySectionName.tsx`
-2. If it needs content, add a data file at `src/data/my-section.ts` (see `docs/data.md`)
-3. Add the component to `App.tsx` inside `<main>`
-4. Add a nav link entry to the `links` array in `Nav.tsx`
+## State ownership
 
-The section's root element should have an `id` matching the nav href:
+All shared state lives in `Chat`. Child components receive only what they need via props — nothing is in global context or a store.
 
-```tsx
-<section id="my-section">...</section>
-```
+| State | Owner | Passed to |
+|---|---|---|
+| `chats` | `Chat` | `SideBar` → `ChatCard` |
+| `activeChat` | `Chat` | `SideBar` → `ChatCard` |
+| `messages` | `Chat` | rendered inline in `Chat` |
+| `isLoading` | `Chat` | rendered inline in `Chat` |
+| `mobileOpen` | `App` | `Chat` → `SideBar` |
+| `isDarkMode` | `App` | toggles `.dark`/`.light` on `<body>` |
 
-## State
+## Adding a new component
 
-Components manage their own local UI state with `useState`. There is no global state store — don't add one. If two components need to share state, lift it to `App.tsx` and pass it as props.
-
-## No external UI libraries
-
-This app uses styled-components for all UI. Do not install shadcn/ui, MUI, Radix, or any other component library. Build what you need with styled-components and native HTML elements.
+1. Create `src/Components/MyComponent/index.tsx` and `styles.scss`
+2. Import styles: `import "./styles.scss"`
+3. Define and export a typed props interface in `index.tsx`
+4. Mount it where needed — lift state to `Chat` or `App` if shared state is required

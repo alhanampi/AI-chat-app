@@ -23,11 +23,12 @@ export async function sendMessageGuest(
 export async function fetchConversations(getToken: GetToken): Promise<ChatObject[]> {
   const headers = await authHeaders(getToken);
   const { data } = await axios.get("/api/conversations", { headers });
-  return data.map((c: { id: string; name: string; created_at: string }) => ({
+  return data.map((c: { id: string; name: string; created_at: string; message_count: string }) => ({
     id: c.id,
     name: c.name,
     date: c.created_at,
     messages: [],
+    messageCount: Number(c.message_count),
   }));
 }
 

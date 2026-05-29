@@ -78,7 +78,17 @@ const ChatCard = ({ chat, isActive, onSelect, onDelete, onRename, onDuplicate }:
           </>
         ) : (
           <>
-            <h4 className={isActive ? "active" : ""}>{chat.name || chat.date}</h4>
+            <div className="chatMeta">
+              <h4 className={isActive ? "active" : ""}>{chat.name || chat.date}</h4>
+              <span className={`messageCount${isActive ? " active" : ""}`}>
+                {(() => {
+                  const count = Number.isFinite(chat.messageCount)
+                    ? chat.messageCount!
+                    : chat.messages.length;
+                  return count === 0 ? "No messages" : `${count} message${count === 1 ? "" : "s"}`;
+                })()}
+              </span>
+            </div>
             <div className="chatListItemActions">
               <i className="bx bx-edit-alt" title="Edit name" onClick={startEditing}></i>
               <i

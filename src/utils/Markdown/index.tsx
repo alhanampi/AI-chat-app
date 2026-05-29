@@ -6,7 +6,7 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { hasNonLatinScript } from "../types";
+import { hasNonLatinScript } from "../constants";
 
 import "./styles.scss";
 

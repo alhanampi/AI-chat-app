@@ -4,12 +4,13 @@
   backdrop-filter: blur(3px);
 }
 
-.popup-content {
-  border: none !important;
-  padding: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  width: auto !important;
+// Double the class to outspecify reactjs-popup's injected stylesheet without !important
+.popup-content.popup-content {
+  border: none;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  width: auto;
 }
 
 .confirmPopup {

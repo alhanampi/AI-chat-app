@@ -11,10 +11,13 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     const rows = await sql`
-      SELECT id, name, created_at, updated_at
-      FROM conversations
-      WHERE user_id = ${userId}
-      ORDER BY updated_at DESC
+      SELECT c.id, c.name, c.created_at, c.updated_at,
+             COUNT(m.id) AS message_count
+      FROM conversations c
+      LEFT JOIN messages m ON m.conversation_id = c.id
+      WHERE c.user_id = ${userId}
+      GROUP BY c.id, c.name, c.created_at, c.updated_at
+      ORDER BY c.updated_at DESC
     `;
     return res.json(rows);
   }

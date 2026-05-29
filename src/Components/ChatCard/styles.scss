@@ -21,18 +21,37 @@
     border-left-color: var(--accent);
   }
 
-  h4 {
-    font-size: 1.6rem;
-    font-weight: 300;
-    color: var(--text-color-soft);
+  .chatMeta {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    gap: 0.2rem;
 
-    &.active {
-      color: var(--text-color);
-      font-weight: 600;
+    h4 {
+      font-size: 1.6rem;
+      font-weight: 300;
+      color: var(--text-color-soft);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      &.active {
+        color: var(--text-color);
+        font-weight: 600;
+      }
+    }
+
+    .messageCount {
+      font-size: 1.1rem;
+      color: var(--text-color-soft);
+      opacity: 0.7;
+
+      &.active {
+        opacity: 0.85;
+        color: var(--text-color);
+      }
     }
   }
 
