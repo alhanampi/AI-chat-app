@@ -182,13 +182,30 @@ html {
   }
 }
 
-.cl-modalContent {
-  .cl-rootBox {
-    margin: 0 auto;
-    width: min(560px, 96vw);
+// Clerk modal — centered in the chat area (excluding sidebar)
+@media (min-width: 801px) {
+  .cl-modalBackdrop .cl-modalContent {
+    margin-left: calc(var(--sidebar-width, 33vw) / 2);
   }
+}
 
-  .cl-card {
-    width: 100%;
-  }
+.cl-modalBackdrop {
+  backdrop-filter: blur(4px);
+}
+
+// Pseudo-states: can't be set via appearance.elements inline styles
+.cl-modalContent .cl-socialButtonsBlockButton:hover {
+  background-color: var(--switch-inactive);
+}
+
+.cl-modalContent .cl-formFieldInput:focus {
+  border-color: var(--main);
+  box-shadow: 0 0 0 2px rgba(144, 122, 214, 0.2);
+}
+
+.dark .cl-modalContent .cl-badge {
+  padding: 5px 10px;
+  font-size: 13px;
+  background-color: #000;
+  color: #fff;
 }

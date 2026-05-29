@@ -20,6 +20,10 @@ const SideBar = ({
   const isDragging = useRef(false);
 
   useEffect(() => {
+    document.body.style.setProperty('--sidebar-width', `${width}px`);
+  }, [width]);
+
+  useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!isDragging.current) return;
       const min = window.innerWidth / 5;
@@ -51,7 +55,7 @@ const SideBar = ({
   return (
     <div
       className={`chatList${mobileOpen ? " mobileOpen" : ""}`}
-      style={{ width }}
+      style={{ '--sidebar-width': `${width}px` } as React.CSSProperties}
     >
       <div className="chatListHeader">
         <h2>Chat List</h2>
