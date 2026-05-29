@@ -12,14 +12,8 @@ app.all("/api/chat", chatHandler);
 app.all("/api/conversations", conversationsHandler);
 
 // duplicate must come before :id so Express matches it first
-app.all("/api/conversations/:id/duplicate", (req, res) => {
-  req.query.id = req.params.id;
-  duplicateHandler(req, res);
-});
-app.all("/api/conversations/:id", (req, res) => {
-  req.query.id = req.params.id;
-  conversationByIdHandler(req, res);
-});
+app.all("/api/conversations/:id/duplicate", duplicateHandler);
+app.all("/api/conversations/:id", conversationByIdHandler);
 
 app.all("/api/migrate", migrateHandler);
 

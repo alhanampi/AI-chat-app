@@ -15,19 +15,15 @@ import {
 } from "../../services/chatService";
 
 import type { ChatObject, ChatProps, Message } from "../../utils/types";
-import { hasNonLatinScript } from "../../utils/types";
+import {
+  hasNonLatinScript,
+  stripMarkdown,
+  PENDING_CHAT_ID,
+} from "../../utils/constants";
 import MarkdownMessage from "../../utils/Markdown/index";
 import SideBar from "../SideBar";
 
 import "./styles.scss";
-
-const stripMarkdown = (text: string) =>
-  text
-    .replace(/```[\s\S]*?```/g, "code block")
-    .replace(/`[^`]+`/g, "")
-    .replace(/[#*_~>]/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .trim();
 
 const SpeakButton = ({ text }: { text: string }) => {
   const [speaking, setSpeaking] = useState(false);
@@ -71,6 +67,9 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const wasSignedOut = useRef(false);
+  // Set synchronously at the start of auth init so fetchMessages (which runs
+  // in the same effect flush, after the init effect) sees it immediately.
+  const authInitInProgress = useRef(false);
 
   useEffect(() => {
     const observer = new MutationObserver(() =>
@@ -101,7 +100,10 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       const migrate = wasSignedOut.current;
       wasSignedOut.current = false;
 
+      setActiveChat(null);
+      setMessages([]);
       setIsInitializing(true);
+      authInitInProgress.current = true;
       (async () => {
         try {
           const dbChats = await fetchConversations(getToken);
@@ -129,6 +131,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
           setActiveChat(dbChats.length > 0 ? dbChats[0].id : null);
           setMessages([]);
         } finally {
+          authInitInProgress.current = false;
           setIsInitializing(false);
         }
       })();
@@ -152,15 +155,24 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
     }
   }, [isLoaded, isSignedIn]);
 
-  // Load messages from DB when active chat changes (auth mode only)
+  // Load messages from DB when active chat changes (auth mode only).
+  // isSignedIn is intentionally excluded from deps: the auth transition is handled
+  // by the init effect above; including it here fires this effect with a stale
+  // guest activeChat before setActiveChat(null) takes effect.
   useEffect(() => {
-    if (!isSignedIn || !activeChat) return;
-    fetchMessages(activeChat, getToken).then((rows) => {
-      setMessages(
-        rows.map((r) => ({ type: r.type, text: r.text, timeStamp: r.timestamp })),
-      );
-    });
-  }, [activeChat, isSignedIn]);
+    if (!isSignedIn || !activeChat || activeChat === PENDING_CHAT_ID || authInitInProgress.current) return;
+    fetchMessages(activeChat, getToken)
+      .then((rows) => {
+        const mapped = rows.map((r) => ({ type: r.type, text: r.text, timeStamp: r.timestamp }));
+        setMessages(mapped);
+        setChats((prev) =>
+          prev.map((c) => (c.id === activeChat ? { ...c, messageCount: mapped.length } : c)),
+        );
+      })
+      .catch((err) => {
+        console.error(`fetchMessages failed for ${activeChat}:`, err?.response?.status, err?.message);
+      });
+  }, [activeChat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist guest chats to localStorage
   useEffect(() => {
@@ -186,6 +198,9 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   };
 
   const handleSelectChat = (id: string) => {
+    if (activeChat === PENDING_CHAT_ID) {
+      setChats((prev) => prev.filter((c) => c.id !== PENDING_CHAT_ID));
+    }
     setActiveChat(id);
     onCloseMobile();
   };
@@ -263,12 +278,13 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       }
     } else {
       // ── Auth mode ───────────────────────────────────────────────────────────
+      const isNewChat = !activeChat || activeChat === PENDING_CHAT_ID;
       setMessages((prev) => [...prev, userMessage]);
 
       try {
         const { reply, conversationId } = await sendMessage(
           userMessage.text,
-          activeChat,
+          isNewChat ? null : activeChat,
           getToken,
         );
         const aiMessage: Message = {
@@ -278,22 +294,32 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
         };
         setMessages((prev) => [...prev, aiMessage]);
 
-        if (!activeChat) {
+        if (isNewChat) {
+          // Replace placeholder with the real conversation
+          setChats((prev) => [
+            { id: conversationId, name: "New Conversation", date: new Date().toLocaleString("en-US"), messages: [], messageCount: 2 },
+            ...prev.filter((c) => c.id !== PENDING_CHAT_ID),
+          ]);
           setActiveChat(conversationId);
-          const updated = await fetchConversations(getToken);
-          setChats(updated);
         } else {
           setChats((prev) => {
             const idx = prev.findIndex((c) => c.id === conversationId);
             if (idx === -1) return prev;
             const next = [...prev];
             const [moved] = next.splice(idx, 1);
-            return [moved, ...next];
+            const prevCount = Number.isFinite(moved.messageCount) ? moved.messageCount! : 0;
+            return [{ ...moved, messageCount: prevCount + 2 }, ...next];
           });
         }
       } catch (error) {
         console.error(error);
         setMessages((prev) => prev.slice(0, -1));
+      }
+
+      // Sync the sidebar with DB — outside the try/catch so a failure here
+      // never wipes the messages that were already shown.
+      if (isNewChat) {
+        fetchConversations(getToken).then(setChats).catch(() => {});
       }
     }
 
@@ -318,7 +344,14 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       setChats((prev) => [newChat, ...prev]);
       setActiveChat(newChat.id);
     } else {
-      setActiveChat(null);
+      setChats((prev) => {
+        if (prev.some((c) => c.id === PENDING_CHAT_ID)) return prev;
+        return [
+          { id: PENDING_CHAT_ID, date: new Date().toLocaleString("en-US"), messages: [], name: "New Conversation" },
+          ...prev,
+        ];
+      });
+      setActiveChat(PENDING_CHAT_ID);
       setMessages([]);
     }
     onCloseMobile();

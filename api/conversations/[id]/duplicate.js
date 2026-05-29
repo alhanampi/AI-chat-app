@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { id } = req.query;
+  const id = req.params?.id ?? req.query?.id;
 
   const [source] = await sql`
     SELECT id, name FROM conversations WHERE id = ${id} AND user_id = ${userId}

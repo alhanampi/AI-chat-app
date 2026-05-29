@@ -2,77 +2,108 @@
 
 ## Overview
 
-Most site content lives in `src/data/` as plain TypeScript files. The one exception is **projects**, which are fetched live from GitHub pinned repos in production via `api/pinned.ts`.
+The app has two data modes that coexist:
 
-```
-src/data/
-  projects.ts    ← Project interface + static array (used as dev fallback)
-  experience.ts  ← Job[]
-  skills.ts      ← SkillCategory[]
+| Mode  | Storage         | Activated when              |
+| ----- | --------------- | --------------------------- |
+| Guest | `localStorage`  | User is not signed in       |
+| Auth  | Neon PostgreSQL | User is signed in via Clerk |
 
-api/
-  pinned.ts      ← Vercel edge function — fetches pinned repos from GitHub GraphQL
-```
+All API communication goes through `src/services/chatService.ts`.
 
-## File convention
+---
 
-Each data file exports:
-1. A typed interface describing one item
-2. A named `const` array of that type
+## Guest mode — localStorage
+
+Guest conversations are stored under two keys:
+
+| Key            | Value                                                          |
+| -------------- | -------------------------------------------------------------- |
+| `"chats"`      | `JSON.stringify(ChatObject[])` — full array including messages |
+| `"activeChat"` | The `id` of the last active conversation                       |
+
+Messages are embedded directly inside each `ChatObject.messages` array. The `chats` array is persisted on every state change via a `useEffect` in `Chat`.
+
+Guest users can use the app fully. When they sign in, their localStorage chats are migrated to the database via `POST /api/migrate` (if the DB has no conversations yet). After migration, localStorage is cleared.
+
+---
+
+## Auth mode — Neon PostgreSQL
+
+### Schema
+
+**`conversations`**
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `uuid` | Primary key, auto-generated |
+| `user_id` | `text` | Clerk user ID |
+| `name` | `text` | Display name, defaults to "New Conversation" |
+| `created_at` | `timestamptz` | Auto-set on insert |
+| `updated_at` | `timestamptz` | Updated on every new message |
+
+**`messages`**
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `uuid` | Primary key |
+| `conversation_id` | `uuid` | Foreign key → `conversations.id` |
+| `type` | `text` | `"prompt"` (user) or `"response"` (AI) |
+| `text` | `text` | Message content |
+| `timestamp` | `text` | Locale string, stored as-is |
+| `created_at` | `timestamptz` | Used for ordering |
+
+### Lazy message loading
+
+In auth mode, `ChatObject.messages` is always `[]` in the sidebar state. Messages for a conversation are fetched from `GET /api/conversations/:id` only when that conversation becomes active. The `messageCount` field on `ChatObject` tracks the real count without loading all messages.
+
+---
+
+## API endpoints
+
+All routes require a Clerk JWT in the `Authorization: Bearer <token>` header, except guest calls to `POST /api/chat` (no token required).
+
+| Method   | Path                               | Purpose                                                                                                             |
+| -------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `POST`   | `/api/chat`                        | Send a message. Guest: stateless, uses `history` from body. Auth: saves to DB, returns `{ reply, conversationId }`. |
+| `GET`    | `/api/conversations`               | List all conversations for the user, ordered by `updated_at DESC`. Includes `message_count` per conversation.       |
+| `GET`    | `/api/conversations/:id`           | Fetch all messages for one conversation, ordered by `created_at ASC`.                                               |
+| `PUT`    | `/api/conversations/:id`           | Rename a conversation.                                                                                              |
+| `DELETE` | `/api/conversations/:id`           | Delete a conversation and its messages.                                                                             |
+| `POST`   | `/api/conversations/:id/duplicate` | Duplicate a conversation and all its messages.                                                                      |
+| `POST`   | `/api/migrate`                     | Bulk-import guest `ChatObject[]` into the DB.                                                                       |
+
+---
+
+## `chatService.ts`
+
+Thin wrappers around Axios. Every auth call calls `getToken()` (Clerk) and passes the result as a Bearer header.
 
 ```ts
-// src/data/projects.ts
-export interface Project {
-  id: string
-  name: string
-  description: string
-  liveUrl: string
-  githubUrl: string
-  tags: string[]
-  featured?: boolean
+fetchConversations(getToken); // GET /api/conversations
+fetchMessages(id, getToken); // GET /api/conversations/:id
+sendMessage(text, convId, getToken); // POST /api/chat (convId may be null → creates new)
+sendMessageGuest(text, history); // POST /api/chat (no token)
+renameConversation(id, name, getToken);
+deleteConversation(id, getToken);
+duplicateConversation(id, getToken);
+migrateLocalStorage(chats, getToken);
+```
+
+---
+
+## Types (`src/utils/types.ts`)
+
+```ts
+interface ChatObject {
+  id: string;
+  date: string; // display date string
+  name: string;
+  messages: Message[]; // always [] in auth mode; full array in guest mode
+  messageCount?: number; // set from DB in auth mode; derived from messages.length in guest mode
 }
 
-export const projects: Project[] = [ ... ]
+interface Message {
+  type: "prompt" | "response";
+  text: string;
+  timeStamp: string;
+}
 ```
-
-Section components import the array directly — no prop drilling, no context:
-
-```ts
-import { projects } from '../data/projects'
-```
-
-## Projects — GitHub pinned repos
-
-In production, `Projects.tsx` fetches `/api/pinned`, which calls the GitHub GraphQL API and returns the repos pinned on the `alhanampi` profile. To change which projects appear: **pin or unpin repos on GitHub** — no code change needed.
-
-The data shape returned by the API matches the `Project` interface:
-- `name` — derived from the repo slug (hyphens → spaces, title-cased)
-- `description` — the repo description field
-- `liveUrl` — the repo's Website field (homepage URL); falls back to the GitHub URL if unset
-- `githubUrl` — the GitHub repo URL
-- `tags` — repository topics
-
-**Set the Website field on each pinned repo** in GitHub repo settings so the "live demo →" link works correctly.
-
-### Local development
-
-The edge function doesn't run under `npm run dev`. To test the projects section locally, use `vercel dev` instead and add `GITHUB_TOKEN` to a `.env.local` file at the project root.
-
-### GITHUB_TOKEN
-
-The edge function requires a `GITHUB_TOKEN` environment variable — a GitHub personal access token with at minimum `public_repo` read scope. Set it in the Vercel project settings under Environment Variables.
-
-## Adding a new project
-
-Add an object to the `projects` array in [src/data/projects.ts](../src/data/projects.ts). Required fields: `id`, `name`, `description`, `liveUrl`, `githubUrl`, `tags`. This only affects the local dev fallback — in production, pin the repo on GitHub instead.
-
-## Adding a new data category
-
-1. Create `src/data/my-category.ts` with an interface and a typed array export
-2. Import it in the relevant section component
-
-Do not fetch content from an API or external source — keep all portfolio data local and version-controlled.
-
-## Hero animation
-
-The `Hero` component uses `@chenglou/pretext` for the canvas text animation. The name segments (`'PAMINA'`, `'GOLDENBERG'`, `'THIERY'`) are hardcoded in [src/components/Hero.tsx](../src/components/Hero.tsx) inside the `useEffect`. To update the displayed name, edit those strings directly — there is no data file for the hero.

@@ -2,105 +2,92 @@
 
 ## Styling approach
 
-**styled-components is the only styling mechanism.** Do not add inline styles, CSS Modules, Tailwind, or any other library.
+**SCSS is the only styling mechanism.** Each component has a colocated `styles.scss` file. No inline styles, no CSS Modules, no Tailwind, no styled-components.
 
-All styled components are defined at the top of the file, above the component function. Import from `styled-components`:
-
-```ts
-import styled, { keyframes } from 'styled-components'
+```
+Chat/
+  index.tsx
+  styles.scss   ← all styles for Chat and its direct DOM children
 ```
 
-## Theme tokens
-
-The theme is provided by `ThemeProvider` in `App.tsx` and typed via `src/styled.d.ts`. Always access design values through the theme — never hardcode colors or fonts.
+Import the file at the top of the component:
 
 ```ts
-// correct
-const Title = styled.h2`
-  color: ${p => p.theme.fg};
-  font-family: ${p => p.theme.fontDisplay};
-`
-
-// forbidden
-const Title = styled.h2`
-  color: #f0ece8;
-  font-family: 'Space Grotesk';
-`
+import "./styles.scss";
 ```
+
+## Prohibited
+
+- **`!important` is banned.** Fix specificity at the selector level instead.
+- **Hardcoded colors.** Always use CSS custom properties (see tokens below).
+- **Inline `style` props** — except for dynamic values that cannot be expressed in SCSS, such as the sidebar width: `style={{ '--sidebar-width': `${width}px` }}`.
+
+## Theming — CSS custom properties
+
+The theme is applied by toggling `.dark` or `.light` on `<body>`. Both classes are defined in `src/index.scss`. Always use the CSS variables they define — never hardcode colors.
 
 ### Available tokens
 
-| Token | Value | Use for |
-|-------|-------|---------|
-| `theme.bg` | `#0c0a0b` | Main background |
-| `theme.bg2` | `#100d0e` | Secondary background |
-| `theme.fg` | `#f0ece8` | Primary text |
-| `theme.fg2` | `#6a6260` | Muted text, labels |
-| `theme.accent` | `#f9a8d4` | Highlights, active states |
-| `theme.accentDim` | `rgba(249,168,212,0.09)` | Hover backgrounds |
-| `theme.border` | `#201a1c` | Borders, dividers |
-| `theme.card` | `#0f0c0d` | Card backgrounds |
-| `theme.fontDisplay` | Space Grotesk stack | Section headings, names |
-| `theme.fontBody` | Inter stack | Body copy, descriptions |
-| `theme.fontMono` | JetBrains Mono stack | Nav links, tags, labels, code |
+| Variable            | Dark value | Light value | Use for                                           |
+| ------------------- | ---------- | ----------- | ------------------------------------------------- |
+| `--bg-color`        | `#131927`  | `#f2eef8`   | Page and panel backgrounds                        |
+| `--text-color`      | `#ebf3ff`  | `#283552`   | Primary text, active states                       |
+| `--text-color-soft` | `#aab8d8`  | `#726b99`   | Secondary text, placeholders, muted labels        |
+| `--switch-active`   | `#907ad6`  | `#907ad6`   | Toggle switch on-state                            |
+| `--switch-inactive` | `#232b3e`  | `#ddd6ec`   | Toggle switch off-state, card backgrounds         |
+| `--main`            | `#7564ac`  | `#8b6bbf`   | Primary accent (borders, icons, buttons)          |
+| `--accent`          | `#a994c6`  | `#b99fd6`   | Secondary accent, gradients                       |
+| `--main-alt`        | `#3382b4`  | `#5a90c0`   | Alternate accent (currently unused in components) |
+| `--accent-alt`      | `#5baac5`  | `#82b8d4`   | Alternate accent pair                             |
 
-### Font assignment rules
+Example:
 
-- `fontDisplay` → large headings and section titles
-- `fontBody` → paragraph text and descriptions
-- `fontMono` → nav links, tech tags, badges, labels, anything code-like
-
-## Transient props
-
-Props that control styling (not passed to the DOM) must be prefixed with `$`. This prevents React from forwarding unknown attributes to HTML elements.
-
-```ts
-const Card = styled.article<{ $hovered: boolean }>`
-  transform: ${p => p.$hovered ? 'translateY(-3px)' : 'none'};
-`
-
-const ActionLink = styled.a<{ $primary?: boolean }>`
-  background: ${p => p.$primary ? p.theme.accent : 'transparent'};
-`
+```scss
+.myElement {
+  background: var(--switch-inactive);
+  color: var(--text-color-soft);
+  border: 1px solid var(--main);
+}
 ```
 
-## Animations
+## Fonts
 
-Define animations with `keyframes` from `styled-components`, not with `@keyframes` in `GlobalStyles`.
+Three fonts are loaded from Google Fonts in `src/index.scss`:
 
-```ts
-import styled, { keyframes } from 'styled-components'
+| Family   | Weight range               | Use for                          |
+| -------- | -------------------------- | -------------------------------- |
+| `Outfit` | 100–900                    | Default body font (`*` selector) |
+| `Inter`  | 100–900                    | Available for secondary text     |
+| `Exo 2`  | 100–900 (including italic) | Available for display text       |
 
-const fadeUp = keyframes`
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0); }
-`
+`Outfit` is the effective default. Do not introduce additional font families.
 
-const Box = styled.div`
-  animation: ${fadeUp} 0.6s ease forwards;
-`
-```
+## Base sizing
 
-Exception: `scrollPulse` is defined in `GlobalStyles` because it's used across multiple components via a named reference. Avoid adding more global keyframes — prefer colocated ones.
+`html { font-size: 62.5% }` — so `1rem = 10px`. All sizing should use `rem` units, not `px`.
 
 ## Responsive breakpoints
 
-Three breakpoints are used in this app. Use them consistently — don't introduce new ones.
+| Breakpoint | Used for                                                                                           |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| `800px`    | Header switches to compact layout; mobile menu button appears; sidebar becomes full-screen overlay |
+| `400px`    | Header title font size reduction                                                                   |
 
-| Breakpoint | Used for |
-|------------|----------|
-| `768px` | Nav padding |
-| `600px` | Side padding (64px → 24px), font size reduction |
-| `400px` | Nav ultra-narrow |
+The sidebar uses a CSS custom property `--sidebar-width` (set inline from React state) on the `.chatList` element so the width can be dynamically controlled without inline styles on inner elements.
 
-The side padding pattern: `64px` on desktop, `24px` on mobile (≤600px). Apply this to any new full-width section:
+## Active state pattern
 
-```ts
-const Section = styled.section`
-  padding: 0 64px;
+The active conversation card uses a gradient background:
 
-  @media (max-width: 600px) {
-    padding: 0 24px;
-  }
-`
+```scss
+&.active {
+  background: linear-gradient(135deg, var(--main), var(--accent));
+  border-left-color: var(--accent);
+}
 ```
+
+Text inside an active card switches to `--text-color` at full weight.
+
+## Emoji picker theming
+
+`emoji-picker-react` receives the `Theme.DARK` or `Theme.LIGHT` enum value from a `isDark` state in `Chat`, which is kept in sync with `document.body.classList` via a `MutationObserver`.
