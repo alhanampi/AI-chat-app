@@ -67,6 +67,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const wasSignedOut = useRef(false);
+  const streamingRef = useRef(false);
   // Set synchronously at the start of auth init so fetchMessages (which runs
   // in the same effect flush, after the init effect) sees it immediately.
   const authInitInProgress = useRef(false);
@@ -186,9 +187,10 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
     else localStorage.removeItem("activeChat");
   }, [activeChat, isSignedIn, isLoaded]);
 
-  // Keep guest messages in sync with chats state
+  // Keep guest messages in sync with chats state (suppressed during streaming
+  // to prevent the effect from wiping the live streaming placeholder).
   useEffect(() => {
-    if (isSignedIn) return;
+    if (isSignedIn || streamingRef.current) return;
     const activeChatObj = chats.find((c) => c.id === activeChat);
     if (activeChatObj) setMessages(activeChatObj.messages);
   }, [activeChat, chats, isSignedIn]);
@@ -232,7 +234,11 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
     if (!isSignedIn) {
       // ── Guest mode ──────────────────────────────────────────────────────────
       let targetChat = activeChat;
-      let updatedChats = chats;
+      const wasNewChat = !activeChat;
+
+      // Suppress sync effect for the duration of streaming so it doesn't
+      // wipe the live placeholder from messages state.
+      streamingRef.current = true;
 
       if (!targetChat) {
         const newChat: ChatObject = {
@@ -241,61 +247,85 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
           messages: [userMessage],
           name: `Conversation ${chats.length + 1}`,
         };
-        updatedChats = [newChat, ...chats];
-        setChats(updatedChats);
+        setChats([newChat, ...chats]);
         setActiveChat(newChat.id);
         targetChat = newChat.id;
-        setMessages([userMessage]);
+        setMessages([userMessage, { type: "response", text: "", timeStamp: "" }]);
       } else {
-        const updatedMessages = [...messages, userMessage];
-        setMessages(updatedMessages);
-        updatedChats = chats.map((c) =>
-          c.id === targetChat ? { ...c, messages: updatedMessages } : c,
+        const withUser = [...messages, userMessage];
+        setMessages([...withUser, { type: "response", text: "", timeStamp: "" }]);
+        setChats((prev) =>
+          prev.map((c) => (c.id === targetChat ? { ...c, messages: withUser } : c)),
         );
-        setChats(updatedChats);
       }
 
       try {
-        const reply = await sendMessageGuest(inputValue, messages);
+        let fullReply = "";
+        await sendMessageGuest(inputValue, messages, (chunk) => {
+          fullReply += chunk;
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.type !== "response") return prev;
+            return [...prev.slice(0, -1), { ...last, text: last.text + chunk }];
+          });
+        });
+
         const aiMessage: Message = {
           type: "response",
-          text: reply,
+          text: fullReply,
           timeStamp: new Date().toLocaleString("en-US"),
         };
-        const finalMessages = [
-          ...(targetChat === activeChat ? messages : [userMessage]),
-          aiMessage,
-        ];
-        setMessages((prev) => [...prev, aiMessage]);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.type !== "response") return prev;
+          return [...prev.slice(0, -1), { ...last, timeStamp: aiMessage.timeStamp }];
+        });
+
+        const finalMessages = wasNewChat
+          ? [userMessage, aiMessage]
+          : [...messages, userMessage, aiMessage];
+
+        streamingRef.current = false;
         setChats((prev) =>
-          prev.map((c) =>
-            c.id === targetChat ? { ...c, messages: finalMessages } : c,
-          ),
+          prev.map((c) => (c.id === targetChat ? { ...c, messages: finalMessages } : c)),
         );
       } catch (error) {
         console.error(error);
-        setMessages((prev) => prev.filter((m) => m !== userMessage));
+        streamingRef.current = false;
+        setMessages((prev) => prev.slice(0, -1));
       }
     } else {
       // ── Auth mode ───────────────────────────────────────────────────────────
       const isNewChat = !activeChat || activeChat === PENDING_CHAT_ID;
-      setMessages((prev) => [...prev, userMessage]);
+      setMessages((prev) => [
+        ...prev,
+        userMessage,
+        { type: "response", text: "", timeStamp: "" },
+      ]);
 
       try {
         const { reply, conversationId, name } = await sendMessage(
           userMessage.text,
           isNewChat ? null : activeChat,
           getToken,
+          (chunk) => {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.type !== "response") return prev;
+              return [...prev.slice(0, -1), { ...last, text: last.text + chunk }];
+            });
+          },
         );
-        const aiMessage: Message = {
-          type: "response",
-          text: reply,
-          timeStamp: new Date().toLocaleString("en-US"),
-        };
-        setMessages((prev) => [...prev, aiMessage]);
+
+        const timestamp = new Date().toLocaleString("en-US");
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.type !== "response") return prev;
+          return [...prev.slice(0, -1), { ...last, text: reply, timeStamp: timestamp }];
+        });
 
         if (isNewChat) {
-          // Replace placeholder with the real conversation
+          // Replace sidebar placeholder with the real conversation
           setChats((prev) => [
             { id: conversationId, name: name || "New Conversation", date: new Date().toLocaleString("en-US"), messages: [], messageCount: 2 },
             ...prev.filter((c) => c.id !== PENDING_CHAT_ID),
@@ -441,36 +471,45 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
           </div>
         )}
         <div className="chat">
-          {messages.map((message, index) => (
-            <Fragment key={index}>
-              <div
-                className={[
-                  message.type === "prompt" ? "userPrompt" : "aiResponse",
-                  message.type === "response" && hasNonLatinScript(message.text)
-                    ? "aiResponse--nonLatin"
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <MarkdownMessage
-                  text={message.text}
-                  nonLatin={
-                    message.type === "response" &&
-                    hasNonLatinScript(message.text)
-                  }
-                />
-              </div>
-              <div
-                className={`messageTimestamp ${message.type === "prompt" ? "messageTimestamp--right" : "messageTimestamp--left"}`}
-              >
-                <SpeakButton text={message.text} />
-                {message.timeStamp}
-              </div>
-            </Fragment>
-          ))}
-
-          {isLoading && <div className="aiResponse loading">loading...</div>}
+          {messages.map((message, index) => {
+            const isStreamingMsg =
+              isLoading &&
+              index === messages.length - 1 &&
+              message.type === "response";
+            return (
+              <Fragment key={index}>
+                <div
+                  className={[
+                    message.type === "prompt" ? "userPrompt" : "aiResponse",
+                    message.type === "response" && hasNonLatinScript(message.text)
+                      ? "aiResponse--nonLatin"
+                      : "",
+                    isStreamingMsg ? "streaming" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {isStreamingMsg && !message.text ? (
+                    <span className="streamingDots" />
+                  ) : (
+                    <MarkdownMessage
+                      text={message.text}
+                      nonLatin={
+                        message.type === "response" &&
+                        hasNonLatinScript(message.text)
+                      }
+                    />
+                  )}
+                </div>
+                <div
+                  className={`messageTimestamp ${message.type === "prompt" ? "messageTimestamp--right" : "messageTimestamp--left"}`}
+                >
+                  {!isStreamingMsg && <SpeakButton text={message.text} />}
+                  {message.timeStamp}
+                </div>
+              </Fragment>
+            );
+          })}
           <div ref={chatEndRef} />
         </div>
 

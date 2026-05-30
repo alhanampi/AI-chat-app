@@ -123,11 +123,25 @@
         }
       }
 
-      .aiLoader {
-        font-family: "Exo 2", sans-serif;
-        font-size: 1.6rem;
-        color: var(--text-color-soft);
-        margin-top: auto;
+      .streaming {
+        &::after {
+          content: "▍";
+          display: inline-block;
+          margin-left: 2px;
+          vertical-align: middle;
+          animation: blink 0.8s step-end infinite;
+        }
+      }
+
+      .streamingDots::after {
+        content: "●●●";
+        letter-spacing: 0.3rem;
+        font-size: 1.2rem;
+        animation: blink 1s step-end infinite;
+      }
+
+      @keyframes blink {
+        50% { opacity: 0; }
       }
     }
 
