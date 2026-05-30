@@ -35,6 +35,7 @@ export default async function handler(req, res) {
 
   // Authenticated mode: save to DB and use DB history
   let convId = conversationId;
+  const isNewConversation = !convId;
 
   if (!convId) {
     const [newConv] = await sql`
@@ -82,7 +83,30 @@ export default async function handler(req, res) {
 
     await sql`UPDATE conversations SET updated_at = NOW() WHERE id = ${convId}`;
 
-    res.json({ reply, conversationId: convId });
+    let conversationName = "New Conversation";
+    if (isNewConversation) {
+      try {
+        const nameCompletion = await client.chat.completions.create({
+          model: "llama-3.1-8b-instant",
+          messages: [
+            {
+              role: "user",
+              content: `Give a very short title (2-5 words) for a conversation that starts with: "${message}". Reply with ONLY the title, no quotes, no punctuation at the end.`,
+            },
+          ],
+          max_tokens: 15,
+        });
+        const generated = nameCompletion.choices[0].message.content?.trim().replace(/^["']|["']$/g, "");
+        if (generated) {
+          conversationName = generated;
+          await sql`UPDATE conversations SET name = ${conversationName} WHERE id = ${convId}`;
+        }
+      } catch {
+        // keep "New Conversation" on failure
+      }
+    }
+
+    res.json({ reply, conversationId: convId, ...(isNewConversation && { name: conversationName }) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error with Groq" });

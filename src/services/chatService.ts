@@ -42,7 +42,7 @@ export async function sendMessage(
   message: string,
   conversationId: string | null,
   getToken: GetToken,
-): Promise<{ reply: string; conversationId: string }> {
+): Promise<{ reply: string; conversationId: string; name?: string }> {
   const headers = await authHeaders(getToken);
   const { data } = await axios.post("/api/chat", { message, conversationId }, { headers });
   return data;
