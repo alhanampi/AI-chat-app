@@ -4,15 +4,27 @@ import { tryGetUserId } from "./_auth.js";
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+function writeChunk(res, text) {
+  res.write(`data: ${JSON.stringify({ t: "c", v: text })}\n\n`);
+}
+
+function writeMeta(res, data) {
+  res.write(`data: ${JSON.stringify({ t: "meta", ...data })}\n\n`);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
   const userId = await tryGetUserId(req);
   const { message, conversationId, history = [] } = req.body;
 
-  // Guest mode: no DB, just call Groq with the history sent from the client
+  // ── Guest mode ──────────────────────────────────────────────────────────
   if (!userId) {
     const groqMessages = [
       ...history.map((m) => ({
@@ -22,67 +34,81 @@ export default async function handler(req, res) {
       { role: "user", content: message },
     ];
     try {
-      const completion = await client.chat.completions.create({
+      const stream = await client.chat.completions.create({
         model: "llama-3.1-8b-instant",
         messages: groqMessages,
+        stream: true,
       });
-      return res.json({ reply: completion.choices[0].message.content });
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content || "";
+        if (text) writeChunk(res, text);
+      }
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: "Error with Groq" });
     }
+    return res.end();
   }
 
-  // Authenticated mode: save to DB and use DB history
+  // ── Authenticated mode ──────────────────────────────────────────────────
   let convId = conversationId;
   const isNewConversation = !convId;
 
-  if (!convId) {
-    const [newConv] = await sql`
-      INSERT INTO conversations (user_id, name)
-      VALUES (${userId}, ${"New Conversation"})
-      RETURNING id
-    `;
-    convId = newConv.id;
-  } else {
-    const [conv] = await sql`
-      SELECT id FROM conversations WHERE id = ${convId} AND user_id = ${userId}
-    `;
-    if (!conv) return res.status(403).json({ error: "Forbidden" });
-  }
-
-  const timestamp = new Date().toLocaleString("en-US");
-  await sql`
-    INSERT INTO messages (conversation_id, type, text, timestamp)
-    VALUES (${convId}, 'prompt', ${message}, ${timestamp})
-  `;
-
-  const dbHistory = await sql`
-    SELECT type, text FROM messages
-    WHERE conversation_id = ${convId}
-    ORDER BY created_at ASC
-  `;
-
-  const groqMessages = dbHistory.map((m) => ({
-    role: m.type === "prompt" ? "user" : "assistant",
-    content: m.text,
-  }));
-
   try {
-    const completion = await client.chat.completions.create({
+    if (!convId) {
+      const [newConv] = await sql`
+        INSERT INTO conversations (user_id, name)
+        VALUES (${userId}, ${"New Conversation"})
+        RETURNING id
+      `;
+      convId = newConv.id;
+    } else {
+      const [conv] = await sql`
+        SELECT id FROM conversations WHERE id = ${convId} AND user_id = ${userId}
+      `;
+      if (!conv) return res.end();
+    }
+
+    const timestamp = new Date().toLocaleString("en-US");
+    await sql`
+      INSERT INTO messages (conversation_id, type, text, timestamp)
+      VALUES (${convId}, 'prompt', ${message}, ${timestamp})
+    `;
+
+    const dbHistory = await sql`
+      SELECT type, text FROM messages
+      WHERE conversation_id = ${convId}
+      ORDER BY created_at ASC
+    `;
+
+    const groqMessages = dbHistory.map((m) => ({
+      role: m.type === "prompt" ? "user" : "assistant",
+      content: m.text,
+    }));
+
+    let fullReply = "";
+    const stream = await client.chat.completions.create({
       model: "llama-3.1-8b-instant",
       messages: groqMessages,
+      stream: true,
     });
-    const reply = completion.choices[0].message.content;
 
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) {
+        fullReply += text;
+        writeChunk(res, text);
+      }
+    }
+
+    // Save AI response and update conversation timestamp
     const aiTimestamp = new Date().toLocaleString("en-US");
     await sql`
       INSERT INTO messages (conversation_id, type, text, timestamp)
-      VALUES (${convId}, 'response', ${reply}, ${aiTimestamp})
+      VALUES (${convId}, 'response', ${fullReply}, ${aiTimestamp})
     `;
-
     await sql`UPDATE conversations SET updated_at = NOW() WHERE id = ${convId}`;
 
+    // Generate name for new conversations
     let conversationName = "New Conversation";
     if (isNewConversation) {
       try {
@@ -106,9 +132,10 @@ export default async function handler(req, res) {
       }
     }
 
-    res.json({ reply, conversationId: convId, ...(isNewConversation && { name: conversationName }) });
+    writeMeta(res, { conversationId: convId, ...(isNewConversation && { name: conversationName }) });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Error with Groq" });
   }
+
+  res.end();
 }
