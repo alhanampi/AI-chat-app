@@ -282,7 +282,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       setMessages((prev) => [...prev, userMessage]);
 
       try {
-        const { reply, conversationId } = await sendMessage(
+        const { reply, conversationId, name } = await sendMessage(
           userMessage.text,
           isNewChat ? null : activeChat,
           getToken,
@@ -297,7 +297,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
         if (isNewChat) {
           // Replace placeholder with the real conversation
           setChats((prev) => [
-            { id: conversationId, name: "New Conversation", date: new Date().toLocaleString("en-US"), messages: [], messageCount: 2 },
+            { id: conversationId, name: name || "New Conversation", date: new Date().toLocaleString("en-US"), messages: [], messageCount: 2 },
             ...prev.filter((c) => c.id !== PENDING_CHAT_ID),
           ]);
           setActiveChat(conversationId);
