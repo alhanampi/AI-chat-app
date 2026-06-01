@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { ChatObject, SideBarProps } from "../../utils/types";
+import { groupChatsByDate } from "./utils";
 import ChatCard from "../ChatCard";
 
 import "./styles.scss";
@@ -52,6 +53,8 @@ const SideBar = ({
     document.body.style.cursor = "col-resize";
   };
 
+  const groups = groupChatsByDate(chats ?? []);
+
   return (
     <div
       className={`chatList${mobileOpen ? " mobileOpen" : ""}`}
@@ -73,18 +76,22 @@ const SideBar = ({
         </div>
       </div>
 
-      {chats &&
-        chats.map((chat: ChatObject) => (
-          <ChatCard
-            key={chat.id}
-            chat={chat}
-            isActive={chat.id === activeChat}
-            onSelect={() => onSelectChat(chat.id)}
-            onDelete={() => onDeleteChat(chat.id)}
-            onRename={(name) => onRenameChat(chat.id, name)}
-            onDuplicate={() => onDuplicateChat(chat.id)}
-          />
-        ))}
+      {groups.map((group) => (
+        <div key={group.label} className="chatGroup">
+          <span className="chatGroupLabel">{group.label}</span>
+          {group.chats.map((chat: ChatObject) => (
+            <ChatCard
+              key={chat.id}
+              chat={chat}
+              isActive={chat.id === activeChat}
+              onSelect={() => onSelectChat(chat.id)}
+              onDelete={() => onDeleteChat(chat.id)}
+              onRename={(name) => onRenameChat(chat.id, name)}
+              onDuplicate={() => onDuplicateChat(chat.id)}
+            />
+          ))}
+        </div>
+      ))}
 
       <div className="resizeHandle" onMouseDown={handleMouseDown} />
     </div>

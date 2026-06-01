@@ -12,10 +12,15 @@ A full-stack AI chat application with optional authentication. Guest users get i
 - **Auth mode** — sign in with Clerk for persistent conversations stored in Neon PostgreSQL
 - **Guest → auth migration** — conversations created as a guest are automatically imported to the database on first sign-in (if the account is new)
 - **AI conversations** powered by Groq (Llama 3.1 8B)
+- **Streaming responses** — AI replies stream in token-by-token via Server-Sent Events, with a live cursor while the response is being generated
 - **Multiple conversations** — create, rename, duplicate, and delete chats
 - **Message count** — each conversation card shows how many messages it contains
+- **Sidebar grouped by date** — conversations are grouped into Today, Yesterday, This week, and Older, just like ChatGPT
 - **Markdown rendering** — AI responses render with full Markdown support: code blocks with syntax highlighting, tables, blockquotes, headings, and lists
+- **Copy message** — hover any message bubble to reveal a copy-to-clipboard button (both user and AI messages)
+- **Regenerate response** — a button below the last AI response lets you regenerate it without retyping your prompt
 - **Read aloud** — any message can be read aloud using the Web Speech API
+- **Visible error handling** — if an API call fails, an inline error banner is shown and the message text is restored to the input so you can retry
 - **Emoji picker** — insert emojis into your message
 - **Dark / light mode** — toggle in the header, defaults to dark
 - **Resizable sidebar** — drag the handle to adjust width on desktop
@@ -122,21 +127,21 @@ This starts two processes concurrently:
 src/
   Components/
     Chat/           ← main orchestrator; owns all shared state
-    SideBar/        ← resizable conversation list + new chat button
+    SideBar/        ← resizable conversation list grouped by date
     ChatCard/       ← single conversation entry (name, count, actions)
     ConfirmPopup/   ← modal for confirming destructive actions
   utils/
     types.ts        ← shared TypeScript interfaces
-    Markdown/       ← MarkdownMessage renderer + SpeakButton
+    Markdown/       ← MarkdownMessage renderer
   services/
-    chatService.ts  ← all API calls (thin Axios wrappers)
+    chatService.ts  ← all API calls (thin Axios + fetch wrappers)
   App.tsx           ← root: header, dark mode toggle, Clerk auth buttons
   index.scss        ← global reset, CSS variables, fonts
 
 api/
   _auth.js          ← Clerk JWT verification helpers
   _db.js            ← Neon client singleton
-  chat.js           ← POST /api/chat (guest + auth)
+  chat.js           ← POST /api/chat (guest + auth, SSE streaming)
   conversations.js  ← GET/POST /api/conversations
   conversations/
     [id]/index.js   ← GET/PUT/DELETE /api/conversations/:id
@@ -159,9 +164,17 @@ All shared state lives in `Chat/index.tsx` and flows down as props. `App.tsx` ow
 
 `Chat` branches on `isSignedIn` throughout its handlers. Guest mode operates on in-memory React state persisted to `localStorage`. Auth mode makes API calls and updates state optimistically while the database write completes in the background; failures roll back the UI.
 
+### Streaming
+
+The API handler writes Server-Sent Events (`data: {"t":"c","v":"chunk"}`). The frontend uses the Fetch Streams API (`ReadableStream`) to read chunks as they arrive and appends each token to the live placeholder message in state.
+
 ### New conversation (auth)
 
 Clicking "new chat" inserts a placeholder entry (`id = "__pending_new__"`) in the sidebar immediately. The real database record is created when the first message is sent. If the user navigates away without sending, the placeholder is removed cleanly.
+
+### Regenerate response
+
+Clicking "Regenerate response" below the last AI message re-submits the last user prompt without retyping. In guest mode the old AI response is replaced cleanly. In auth mode the new response is appended to the database conversation (the session shows the replacement).
 
 ### Message count
 

@@ -14,6 +14,8 @@ src/
       styles.scss
     SideBar/
       index.tsx
+      types.ts           ← component-local types and interfaces
+      utils.ts           ← component-local utility functions and constants
       styles.scss
     ChatCard/
       index.tsx
@@ -51,11 +53,30 @@ docs/                    ← this documentation
 
 ## Types — `src/utils/types.ts`
 
-All interfaces shared across more than one file go here. Types used only inside a single component are defined inline in that component's `index.tsx`.
+All interfaces shared across more than one file go here.
 
 **What belongs here:** `ChatObject`, `Message`, `ChatCardProps`, `SideBarProps`, `ChatProps`, `ConfirmPopupProps`
 
 **What does not belong here:** types local to one component, API response shapes (define those inline in `chatService.ts`)
+
+---
+
+## Component-local types, utils, and constants
+
+Types, interfaces, utility functions, and constants that belong to a single component live in dedicated files inside the component folder — **never inline in `index.tsx`**.
+
+```
+ComponentName/
+  index.tsx       ← only the component(s) and React logic
+  types.ts        ← local types and interfaces
+  utils.ts        ← local utility functions and pure-logic constants
+  styles.scss
+```
+
+- `types.ts` contains `type` and `interface` declarations used only within that component.
+- `utils.ts` contains helper functions and module-level constants (e.g. `MS_PER_DAY`, group labels).
+- If a type or utility grows to be needed by a second component, move it to `src/utils/types.ts` or `src/utils/constants.ts` respectively.
+- `index.tsx` imports from `./types` and `./utils` — never declares them inline.
 
 ---
 
@@ -151,3 +172,4 @@ import "./styles.scss";
 | Guest/auth branching only in `Chat`, never in `chatService` | Service stays stateless and reusable                              |
 | SCSS colocated with each component                          | No global class leakage; easy to find styles                      |
 | CSS custom properties for all colors                        | Single source of truth; dark/light swap with one class toggle     |
+| Component-local types in `types.ts`, utils in `utils.ts`   | `index.tsx` stays focused on rendering; logic is easy to test     |
