@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { v4 as uuid } from "uuid";
 import EmojiPicker, { type EmojiClickData, Theme } from "emoji-picker-react";
@@ -24,6 +24,28 @@ import MarkdownMessage from "../../utils/Markdown/index";
 import SideBar from "../SideBar";
 
 import "./styles.scss";
+
+const CopyButton = ({ text }: { text: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard access denied
+    }
+  };
+
+  return (
+    <i
+      className={`fa-solid ${copied ? "fa-check" : "fa-copy"} copyBtn`}
+      onClick={handleCopy}
+      title={copied ? "Copied!" : "Copy"}
+    />
+  );
+};
 
 const SpeakButton = ({ text }: { text: string }) => {
   const [speaking, setSpeaking] = useState(false);
@@ -59,6 +81,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(() =>
     document.body.classList.contains("dark"),
   );
@@ -172,6 +195,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       })
       .catch((err) => {
         console.error(`fetchMessages failed for ${activeChat}:`, err?.response?.status, err?.message);
+        setErrorMsg("Failed to load messages. Refresh or try another conversation.");
       });
   }, [activeChat]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -204,6 +228,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       setChats((prev) => prev.filter((c) => c.id !== PENDING_CHAT_ID));
     }
     setActiveChat(id);
+    setErrorMsg(null);
     onCloseMobile();
   };
 
@@ -221,15 +246,18 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
 
   const handleSendMessage = async () => {
     if (inputValue.trim() === "") return;
-
-    const userMessage: Message = {
-      type: "prompt",
-      text: inputValue,
-      timeStamp: new Date().toLocaleString("en-US"),
-    };
+    // Capture before clearing so closures and error recovery both see the original text
+    const text = inputValue;
 
     setInputValue("");
     setIsLoading(true);
+    setErrorMsg(null);
+
+    const userMessage: Message = {
+      type: "prompt",
+      text,
+      timeStamp: new Date().toLocaleString("en-US"),
+    };
 
     if (!isSignedIn) {
       // ── Guest mode ──────────────────────────────────────────────────────────
@@ -261,7 +289,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
 
       try {
         let fullReply = "";
-        await sendMessageGuest(inputValue, messages, (chunk) => {
+        await sendMessageGuest(text, messages, (chunk) => {
           fullReply += chunk;
           setMessages((prev) => {
             const last = prev[prev.length - 1];
@@ -292,7 +320,12 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       } catch (error) {
         console.error(error);
         streamingRef.current = false;
-        setMessages((prev) => prev.slice(0, -1));
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          return last?.type === "response" && !last.timeStamp ? prev.slice(0, -1) : prev;
+        });
+        setInputValue(text);
+        setErrorMsg("Failed to send message. Try again.");
       }
     } else {
       // ── Auth mode ───────────────────────────────────────────────────────────
@@ -305,7 +338,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
 
       try {
         const { reply, conversationId, name } = await sendMessage(
-          userMessage.text,
+          text,
           isNewChat ? null : activeChat,
           getToken,
           (chunk) => {
@@ -343,13 +376,105 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
         }
       } catch (error) {
         console.error(error);
-        setMessages((prev) => prev.slice(0, -1));
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          return last?.type === "response" && !last.timeStamp ? prev.slice(0, -1) : prev;
+        });
+        setInputValue(text);
+        setErrorMsg("Failed to send message. Try again.");
       }
 
       // Sync the sidebar with DB — outside the try/catch so a failure here
       // never wipes the messages that were already shown.
       if (isNewChat) {
         fetchConversations(getToken).then(setChats).catch(() => {});
+      }
+    }
+
+    setIsLoading(false);
+  };
+
+  const handleRegenerate = async () => {
+    if (isLoading) return;
+
+    // Find the last user message in the current conversation
+    const lastUserIdx = messages.map((m) => m.type).lastIndexOf("prompt");
+    if (lastUserIdx === -1) return;
+
+    const lastUserText = messages[lastUserIdx].text;
+    // History for the API = everything before the last user message
+    const historyBeforeRegen = messages.slice(0, lastUserIdx);
+    // UI messages to keep = up to and including the last user message
+    const messagesWithUser = messages.slice(0, lastUserIdx + 1);
+
+    setErrorMsg(null);
+    setIsLoading(true);
+    setMessages([...messagesWithUser, { type: "response", text: "", timeStamp: "" }]);
+
+    if (!isSignedIn) {
+      streamingRef.current = true;
+
+      try {
+        let fullReply = "";
+        await sendMessageGuest(lastUserText, historyBeforeRegen, (chunk) => {
+          fullReply += chunk;
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.type !== "response") return prev;
+            return [...prev.slice(0, -1), { ...last, text: last.text + chunk }];
+          });
+        });
+
+        const aiMessage: Message = {
+          type: "response",
+          text: fullReply,
+          timeStamp: new Date().toLocaleString("en-US"),
+        };
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.type !== "response") return prev;
+          return [...prev.slice(0, -1), { ...last, timeStamp: aiMessage.timeStamp }];
+        });
+
+        streamingRef.current = false;
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === activeChat
+              ? { ...c, messages: [...messagesWithUser, aiMessage] }
+              : c,
+          ),
+        );
+      } catch (error) {
+        console.error(error);
+        streamingRef.current = false;
+        setMessages(messagesWithUser);
+        setErrorMsg("Failed to regenerate. Try again.");
+      }
+    } else {
+      try {
+        const { reply } = await sendMessage(
+          lastUserText,
+          activeChat!,
+          getToken,
+          (chunk) => {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.type !== "response") return prev;
+              return [...prev.slice(0, -1), { ...last, text: last.text + chunk }];
+            });
+          },
+        );
+
+        const timestamp = new Date().toLocaleString("en-US");
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.type !== "response") return prev;
+          return [...prev.slice(0, -1), { ...last, text: reply, timeStamp: timestamp }];
+        });
+      } catch (error) {
+        console.error(error);
+        setMessages(messagesWithUser);
+        setErrorMsg("Failed to regenerate. Try again.");
       }
     }
 
@@ -384,6 +509,7 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
       setActiveChat(PENDING_CHAT_ID);
       setMessages([]);
     }
+    setErrorMsg(null);
     onCloseMobile();
   };
 
@@ -404,30 +530,50 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
         return next;
       });
     } else {
-      const newConv = await duplicateConversation(id, getToken);
-      const duplicate: ChatObject = {
-        id: newConv.id,
-        name: newConv.name,
-        date: newConv.created_at,
-        messages: [],
-      };
-      setChats((prev) => {
-        const next = [...prev];
-        next.splice(idx + 1, 0, duplicate);
-        return next;
-      });
+      try {
+        const newConv = await duplicateConversation(id, getToken);
+        const duplicate: ChatObject = {
+          id: newConv.id,
+          name: newConv.name,
+          date: newConv.created_at,
+          messages: [],
+        };
+        setChats((prev) => {
+          const next = [...prev];
+          next.splice(idx + 1, 0, duplicate);
+          return next;
+        });
+      } catch (error) {
+        console.error(error);
+        setErrorMsg("Failed to duplicate conversation. Try again.");
+      }
     }
   };
 
   const handleRenameChat = async (id: string, name: string) => {
-    setChats((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, name } : c)),
-    );
-    if (isSignedIn) await renameConversation(id, name, getToken);
+    const originalName = chats.find((c) => c.id === id)?.name ?? name;
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
+    if (isSignedIn) {
+      try {
+        await renameConversation(id, name, getToken);
+      } catch (error) {
+        console.error(error);
+        setChats((prev) => prev.map((c) => (c.id === id ? { ...c, name: originalName } : c)));
+        setErrorMsg("Failed to rename conversation. Try again.");
+      }
+    }
   };
 
   const handleDeleteChat = async (id: string) => {
-    if (isSignedIn) await deleteConversation(id, getToken);
+    if (isSignedIn) {
+      try {
+        await deleteConversation(id, getToken);
+      } catch (error) {
+        console.error(error);
+        setErrorMsg("Failed to delete conversation. Try again.");
+        return;
+      }
+    }
     const remaining = chats.filter((c) => c.id !== id);
     setChats(remaining);
     if (id === activeChat) {
@@ -476,12 +622,17 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
               isLoading &&
               index === messages.length - 1 &&
               message.type === "response";
+            const isLastMsg = index === messages.length - 1;
+            const isAIMsg = message.type === "response";
             return (
-              <Fragment key={index}>
+              <div
+                key={index}
+                className={`messagePair messagePair--${isAIMsg ? "left" : "right"}`}
+              >
                 <div
                   className={[
-                    message.type === "prompt" ? "userPrompt" : "aiResponse",
-                    message.type === "response" && hasNonLatinScript(message.text)
+                    isAIMsg ? "aiResponse" : "userPrompt",
+                    isAIMsg && hasNonLatinScript(message.text)
                       ? "aiResponse--nonLatin"
                       : "",
                     isStreamingMsg ? "streaming" : "",
@@ -494,24 +645,35 @@ const Chat = ({ mobileOpen, onCloseMobile }: ChatProps) => {
                   ) : (
                     <MarkdownMessage
                       text={message.text}
-                      nonLatin={
-                        message.type === "response" &&
-                        hasNonLatinScript(message.text)
-                      }
+                      nonLatin={isAIMsg && hasNonLatinScript(message.text)}
                     />
                   )}
                 </div>
                 <div
-                  className={`messageTimestamp ${message.type === "prompt" ? "messageTimestamp--right" : "messageTimestamp--left"}`}
+                  className={`messageTimestamp ${isAIMsg ? "messageTimestamp--left" : "messageTimestamp--right"}`}
                 >
+                  {!isStreamingMsg && <CopyButton text={message.text} />}
                   {!isStreamingMsg && <SpeakButton text={message.text} />}
                   {message.timeStamp}
                 </div>
-              </Fragment>
+                {isLastMsg && isAIMsg && !isLoading && (
+                  <button className="regenerateBtn" onClick={handleRegenerate}>
+                    <i className="fa-solid fa-rotate-right" /> Regenerate response
+                  </button>
+                )}
+              </div>
             );
           })}
           <div ref={chatEndRef} />
         </div>
+
+        {errorMsg && (
+          <div className="errorBanner">
+            <i className="fa-solid fa-circle-exclamation" />
+            <span>{errorMsg}</span>
+            <i className="fa-solid fa-xmark errorBanner__close" onClick={() => setErrorMsg(null)} />
+          </div>
+        )}
 
         <form
           className="messageForm"

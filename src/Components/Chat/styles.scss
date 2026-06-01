@@ -71,6 +71,32 @@
         background: color-mix(in srgb, var(--switch-active) 90%, white);
       }
 
+      // Wrapper for each message bubble + timestamp + optional regenerate btn.
+      // Using a div instead of Fragment so we can target hover across the pair.
+      .messagePair {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+
+        &--left {
+          align-items: flex-start;
+        }
+
+        &--right {
+          align-items: flex-end;
+        }
+
+        // Reveal copy button on hover of the whole pair
+        .copyBtn {
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+
+        &:hover .copyBtn {
+          opacity: 1;
+        }
+      }
+
       .userPrompt,
       .aiResponse {
         max-width: 80%;
@@ -82,7 +108,6 @@
 
       .userPrompt {
         background: linear-gradient(135deg, var(--main), var(--accent));
-        align-self: flex-end;
         border-radius: 1.8rem 0.4rem 1.8rem 1.8rem;
         text-align: right;
       }
@@ -91,27 +116,29 @@
         background: linear-gradient(135deg, var(--main-alt), var(--accent-alt));
         border-radius: 0.4rem 1.8rem 1.8rem 1.8rem;
         text-align: left;
-
       }
 
       .messageTimestamp {
-        margin-top: -1.5rem;
         font-size: 1.2rem;
         color: var(--text-color-soft);
         display: flex;
         align-items: center;
         gap: 0.6rem;
 
+        .copyBtn,
         .speakBtn {
           font-size: 1.3rem;
           color: var(--main);
           cursor: pointer;
-          opacity: 0.6;
           transition: opacity 0.2s;
 
           &:hover {
-            opacity: 1;
+            opacity: 1 !important;
           }
+        }
+
+        .speakBtn {
+          opacity: 0.6;
         }
 
         &--left {
@@ -120,6 +147,30 @@
 
         &--right {
           text-align: right;
+        }
+      }
+
+      .regenerateBtn {
+        background: none;
+        border: 1px solid var(--switch-inactive);
+        border-radius: 2rem;
+        color: var(--text-color-soft);
+        font-size: 1.2rem;
+        padding: 0.4rem 1.2rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: color 0.2s, border-color 0.2s;
+        margin-top: 0.2rem;
+
+        i {
+          font-size: 1.1rem;
+        }
+
+        &:hover {
+          color: var(--main);
+          border-color: var(--main);
         }
       }
 
@@ -142,6 +193,41 @@
 
       @keyframes blink {
         50% { opacity: 0; }
+      }
+    }
+
+    .errorBanner {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 0.8rem 1.4rem;
+      margin-bottom: 0.6rem;
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      border-radius: 0.8rem;
+      font-size: 1.4rem;
+      color: var(--text-color);
+
+      i:first-child {
+        color: var(--accent);
+        font-size: 1.5rem;
+        flex-shrink: 0;
+      }
+
+      span {
+        flex: 1;
+      }
+
+      &__close {
+        cursor: pointer;
+        opacity: 0.6;
+        flex-shrink: 0;
+        font-size: 1.4rem !important;
+        transition: opacity 0.2s;
+
+        &:hover {
+          opacity: 1;
+        }
       }
     }
 
