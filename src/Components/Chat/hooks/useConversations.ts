@@ -62,8 +62,12 @@ export function useConversations(
           }
 
           setChats(dbChats);
-          setActiveChat(dbChats.length > 0 ? dbChats[0].id : null);
           setMessages([]);
+          if (dbChats.length > 0) {
+            setActiveChat(dbChats[0].id);
+          } else {
+            createNewChat();
+          }
         } finally {
           authInitInProgress.current = false;
           setIsInitializing(false);
@@ -75,14 +79,17 @@ export function useConversations(
         const stored = localStorage.getItem("chats");
         const localChats: ChatObject[] = stored ? JSON.parse(stored) : [];
         setChats(localChats);
-        const lastActive = localStorage.getItem("activeChat");
-        const first = localChats.find((c) => c.id === lastActive) ?? localChats[0];
-        setActiveChat(first?.id ?? null);
-        setMessages(first?.messages ?? []);
+        if (localChats.length === 0) {
+          createNewChat();
+        } else {
+          const lastActive = localStorage.getItem("activeChat");
+          const first = localChats.find((c) => c.id === lastActive) ?? localChats[0];
+          setActiveChat(first?.id ?? null);
+          setMessages(first?.messages ?? []);
+        }
       } catch {
         setChats([]);
-        setActiveChat(null);
-        setMessages([]);
+        createNewChat();
       }
       setIsInitializing(false);
     }
@@ -150,8 +157,10 @@ export function useConversations(
     }
     const remaining = chats.filter((c) => c.id !== id);
     setChats(remaining);
-    if (id === activeChat) {
-      setActiveChat(remaining.length > 0 ? remaining[0].id : null);
+    if (remaining.length === 0) {
+      createNewChat();
+    } else if (id === activeChat) {
+      setActiveChat(remaining[0].id);
     }
   };
 
