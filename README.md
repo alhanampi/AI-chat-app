@@ -126,12 +126,16 @@ This starts two processes concurrently:
 ```
 src/
   Components/
-    Chat/           ← main orchestrator; owns all shared state
+    Chat/           ← main orchestrator; wires hooks and renders JSX
+      hooks/        ← useConversations (CRUD, auth, localStorage), useMessaging (send, regenerate, streaming)
     SideBar/        ← resizable conversation list grouped by date
     ChatCard/       ← single conversation entry (name, count, actions)
     ConfirmPopup/   ← modal for confirming destructive actions
+    CopyButton/     ← copy-to-clipboard button
+    SpeakButton/    ← text-to-speech button (Web Speech API)
   utils/
     types.ts        ← shared TypeScript interfaces
+    constants.ts    ← shared utilities and constants (stripMarkdown, PENDING_CHAT_ID, …)
     Markdown/       ← MarkdownMessage renderer
   services/
     chatService.ts  ← all API calls (thin Axios + fetch wrappers)
@@ -158,7 +162,7 @@ docs/               ← architecture documentation
 
 ### No global state
 
-All shared state lives in `Chat/index.tsx` and flows down as props. `App.tsx` owns only `isDarkMode` and `mobileOpen`. No Redux, no Context, no store.
+All shared state is managed by two custom hooks (`useConversations`, `useMessaging`) consumed in `Chat/index.tsx`, which wires them together and renders JSX. `App.tsx` owns only `isDarkMode` and `mobileOpen`. No Redux, no Context, no store.
 
 ### Guest vs auth branching
 

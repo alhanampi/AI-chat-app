@@ -10,8 +10,15 @@ Architecture and conventions for this AI chat app. Read alongside [`docs/compone
 src/
   Components/
     Chat/
-      index.tsx          ← main orchestrator; all shared state lives here
+      index.tsx          ← JSX and hook wiring only; no business logic
+      hooks/
+        useConversations.ts  ← chat CRUD, auth init, localStorage, message sync
+        useMessaging.ts      ← send, regenerate, streaming
       styles.scss
+    CopyButton/
+      index.tsx
+    SpeakButton/
+      index.tsx
     SideBar/
       index.tsx
       types.ts           ← component-local types and interfaces
@@ -25,6 +32,7 @@ src/
       styles.scss
   utils/
     types.ts             ← shared TypeScript interfaces (ChatObject, Message, *Props)
+    constants.ts         ← shared utilities and constants (stripMarkdown, hasNonLatinScript, PENDING_CHAT_ID)
     Markdown/
       index.tsx          ← MarkdownMessage component
       styles.scss
@@ -80,6 +88,16 @@ ComponentName/
 
 ---
 
+## Shared utilities — `src/utils/constants.ts`
+
+Pure functions and module-level constants used by more than one component live here.
+
+**What belongs here:** `PENDING_CHAT_ID`, `stripMarkdown`, `hasNonLatinScript`, and any other utility or constant with no component-specific context.
+
+**What does not belong here:** types or interfaces (those go in `types.ts`), component-local constants (those stay in `ComponentName/utils.ts`).
+
+---
+
 ## Services — `src/services/chatService.ts`
 
 All network calls go through `chatService.ts`. Components never call `axios` or `fetch` directly.
@@ -99,7 +117,13 @@ Handlers follow the Vercel serverless function signature: `export default async 
 
 ## State management
 
-No global store. All shared state lives in `Chat/index.tsx` and is passed down as props. `App.tsx` owns only `isDarkMode` and `mobileOpen`.
+No global store. All shared state lives in `Chat/index.tsx` (via hooks) and is passed down as props. `App.tsx` owns only `isDarkMode` and `mobileOpen`.
+
+Business logic is split into two custom hooks in `Chat/hooks/`:
+- `useConversations` — owns `chats`, `activeChat`, `messages`, all CRUD handlers, auth init, and localStorage persistence.
+- `useMessaging` — owns `isLoading`, `handleSendMessage`, and `handleRegenerate`; receives state slices from `useConversations`.
+
+`Chat/index.tsx` only wires these hooks together and renders JSX. It owns only UI-local state (`inputValue`, `showEmojiPicker`, `isDark`, `errorMsg`).
 
 If state needs to be shared between two components that are siblings: lift it to their nearest common ancestor (`Chat` or `App`).
 
